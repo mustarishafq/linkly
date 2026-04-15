@@ -1,0 +1,85 @@
+{
+  "name": "ClickLog",
+  "type": "object",
+  "properties": {
+    "link_id": {
+      "type": "string",
+      "description": "Associated short link ID"
+    },
+    "slug": {
+      "type": "string"
+    },
+    "campaign_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ip_address": {
+      "type": "string"
+    },
+    "user_agent": {
+      "type": "string"
+    },
+    "browser": {
+      "type": "string"
+    },
+    "browser_version": {
+      "type": "string"
+    },
+    "device_type": {
+      "type": "string",
+      "enum": [
+        "Desktop",
+        "Mobile",
+        "Tablet"
+      ]
+    },
+    "platform": {
+      "type": "string"
+    },
+    "referrer": {
+      "type": "string"
+    },
+    "referrer_source": {
+      "type": "string",
+      "enum": [
+        "Facebook",
+        "Instagram",
+        "WhatsApp",
+        "Twitter",
+        "Google",
+        "Direct",
+        "Email",
+        "Other"
+      ]
+    },
+    "country": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "is_unique": {
+      "type": "boolean",
+      "default": false
+    },
+    "visitor_hash": {
+      "type": "string",
+      "description": "Hash of IP + User Agent for unique visitor tracking"
+    },
+    "is_converted": {
+      "type": "boolean",
+      "default": false
+    },
+    "ab_variant": {
+      "type": "string",
+      "description": "Which A/B variant was served"
+    }
+  },
+  "required": [
+    "link_id",
+    "slug"
+  ]
+}

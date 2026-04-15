@@ -1,0 +1,37 @@
+{
+  "name": "ABVariant",
+  "type": "object",
+  "properties": {
+    "link_id": {
+      "type": "string",
+      "description": "Parent short link ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Variant name (e.g. Variant A, Variant B)"
+    },
+    "destination_url": {
+      "type": "string",
+      "description": "URL for this variant"
+    },
+    "weight": {
+      "type": "number",
+      "description": "Traffic distribution percentage (0-100)",
+      "default": 50
+    },
+    "clicks": {
+      "type": "number",
+      "default": 0
+    },
+    "conversions": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "link_id",
+    "name",
+    "destination_url",
+    "weight"
+  ]
+}

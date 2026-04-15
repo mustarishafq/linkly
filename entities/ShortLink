@@ -1,0 +1,75 @@
+{
+  "name": "ShortLink",
+  "type": "object",
+  "properties": {
+    "slug": {
+      "type": "string",
+      "description": "Custom or auto-generated slug for the short URL"
+    },
+    "destination_url": {
+      "type": "string",
+      "description": "The target URL to redirect to"
+    },
+    "title": {
+      "type": "string",
+      "description": "Friendly name for the link"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags for organizing links"
+    },
+    "campaign_id": {
+      "type": "string",
+      "description": "Associated campaign ID"
+    },
+    "facebook_pixel_id": {
+      "type": "string",
+      "description": "Optional Facebook Pixel ID for tracking"
+    },
+    "expire_by_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiry date for the link"
+    },
+    "expire_by_clicks": {
+      "type": "number",
+      "description": "Max clicks before expiry"
+    },
+    "fallback_url": {
+      "type": "string",
+      "description": "URL to redirect to after expiry"
+    },
+    "total_clicks": {
+      "type": "number",
+      "default": 0
+    },
+    "unique_clicks": {
+      "type": "number",
+      "default": 0
+    },
+    "conversions": {
+      "type": "number",
+      "default": 0
+    },
+    "is_ab_test": {
+      "type": "boolean",
+      "default": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "expired",
+        "paused"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "slug",
+    "destination_url"
+  ]
+}

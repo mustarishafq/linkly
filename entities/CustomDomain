@@ -1,0 +1,53 @@
+{
+  "name": "CustomDomain",
+  "type": "object",
+  "properties": {
+    "domain": {
+      "type": "string",
+      "description": "Custom hostname to use for short links, e.g. go.example.com"
+    },
+    "owner_user_id": {
+      "type": "string",
+      "description": "User ID who registered this domain"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive"],
+      "default": "active"
+    },
+    "verification_token": {
+      "type": "string",
+      "description": "Domain DNS verification token"
+    },
+    "verification_name": {
+      "type": "string",
+      "description": "TXT record hostname to verify"
+    },
+    "verification_value": {
+      "type": "string",
+      "description": "TXT record expected value"
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": ["pending", "verified"],
+      "default": "pending"
+    },
+    "verification_last_checked_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verification_verified_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verification_error": {
+      "type": "string",
+      "description": "Last DNS verification error message"
+    }
+  },
+  "required": ["domain"]
+}

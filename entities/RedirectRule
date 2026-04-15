@@ -1,0 +1,42 @@
+{
+  "name": "RedirectRule",
+  "type": "object",
+  "properties": {
+    "link_id": {
+      "type": "string",
+      "description": "Associated short link ID"
+    },
+    "rule_type": {
+      "type": "string",
+      "enum": [
+        "country",
+        "device",
+        "schedule"
+      ],
+      "description": "Type of redirect rule"
+    },
+    "condition_value": {
+      "type": "string",
+      "description": "Value to match (e.g. country code, device type, time range)"
+    },
+    "redirect_url": {
+      "type": "string",
+      "description": "URL to redirect to when condition matches"
+    },
+    "priority": {
+      "type": "number",
+      "default": 0,
+      "description": "Priority order (higher = checked first)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "link_id",
+    "rule_type",
+    "condition_value",
+    "redirect_url"
+  ]
+}

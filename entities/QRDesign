@@ -1,0 +1,56 @@
+{
+  "name": "QRDesign",
+  "type": "object",
+  "properties": {
+    "link_id": {
+      "type": "string",
+      "description": "Associated short link ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Design name"
+    },
+    "fg_color": {
+      "type": "string",
+      "description": "Foreground/data color (hex)",
+      "default": "#000000"
+    },
+    "bg_color": {
+      "type": "string",
+      "description": "Background color (hex)",
+      "default": "#ffffff"
+    },
+    "eye_color": {
+      "type": "string",
+      "description": "Eye/corner square color (hex)",
+      "default": "#000000"
+    },
+    "style": {
+      "type": "string",
+      "enum": [
+        "square",
+        "rounded",
+        "dots"
+      ],
+      "default": "square"
+    },
+    "size": {
+      "type": "number",
+      "description": "Size in pixels",
+      "default": 300
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Optional logo image URL"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Only one design per link can be active"
+    }
+  },
+  "required": [
+    "link_id",
+    "name"
+  ]
+}
