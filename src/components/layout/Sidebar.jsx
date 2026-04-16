@@ -9,8 +9,7 @@ import {
   Route,
   Globe,
   Shield,
-  ChevronLeft,
-  ChevronRight,
+  Menu,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,13 +38,25 @@ export default function Sidebar({ collapsed, onToggle }) {
         collapsed ? "w-[68px]" : "w-[240px]"
       )}
     >
-      <div className="flex items-center gap-2.5 px-4 h-16 border-b border-border shrink-0">
-        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <Zap className="h-4 w-4 text-primary-foreground" />
-        </div>
+      <div className="flex items-center justify-between px-4 h-16 border-b border-border shrink-0">
         {!collapsed && (
-          <span className="font-bold text-lg tracking-tight">Linkly</span>
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <Zap className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-lg tracking-tight">Linkly</span>
+          </div>
         )}
+        <button
+          onClick={onToggle}
+          className={cn(
+            "shrink-0 flex items-center justify-center h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors",
+            collapsed && "mx-auto"
+          )}
+          aria-label="Toggle sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
       </div>
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
@@ -70,13 +81,6 @@ export default function Sidebar({ collapsed, onToggle }) {
           );
         })}
       </nav>
-
-      <button
-        onClick={onToggle}
-        className="flex items-center justify-center h-12 border-t border-border text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-      </button>
     </aside>
   );
 }
