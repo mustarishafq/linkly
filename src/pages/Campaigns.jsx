@@ -3,13 +3,27 @@ import db from "@/api/openClient";
 import { useEffect, useState } from "react";
 
 import { Link } from "react-router-dom";
-import { Plus, Megaphone, MoreHorizontal, Trash2, Edit, X } from "lucide-react";
+import {
+  Plus,
+  Megaphone,
+  MoreHorizontal,
+  Trash2,
+  Edit,
+  X,
+  MousePointerClick,
+  Link2,
+  TrendingUp,
+  ChevronRight,
+  Calendar,
+  BarChart3,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -43,31 +57,74 @@ export default function Campaigns() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
+  const totalClicks = links.reduce((sum, l) => sum + (l.total_clicks || 0), 0);
+  const activeCampaigns = campaigns.filter((c) => c.status === "active").length;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
-          <p className="text-muted-foreground mt-1">{campaigns.length} campaigns</p>
+          <p className="text-muted-foreground mt-1 text-sm">Organize and track groups of links</p>
         </div>
         <button
           onClick={() => { setEditing(null); setShowForm(true); }}
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm shrink-0"
         >
           <Plus className="h-4 w-4" /> New Campaign
         </button>
       </div>
 
+      {/* Stats Row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Megaphone className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-xl font-bold">{campaigns.length}</p>
+            <p className="text-[11px] text-muted-foreground">Total Campaigns</p>
+          </div>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-emerald-500/10">
+            <TrendingUp className="h-4 w-4 text-emerald-500" />
+          </div>
+          <div>
+            <p className="text-xl font-bold">{activeCampaigns}</p>
+            <p className="text-[11px] text-muted-foreground">Active</p>
+          </div>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-blue-500/10">
+            <MousePointerClick className="h-4 w-4 text-blue-500" />
+          </div>
+          <div>
+            <p className="text-xl font-bold">{totalClicks.toLocaleString()}</p>
+            <p className="text-[11px] text-muted-foreground">Total Clicks</p>
+          </div>
+        </div>
+      </div>
+
       {campaigns.length === 0 ? (
-        <div className="bg-card rounded-xl border border-border p-12 text-center">
-          <Megaphone className="h-12 w-12 text-muted-foreground/30 mx-auto" />
-          <p className="mt-4 text-lg font-medium">No campaigns yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Group your links under campaigns</p>
+        <div className="bg-card rounded-2xl border border-border p-16 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+            <Megaphone className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+          <p className="text-base font-semibold">No campaigns yet</p>
+          <p className="text-sm text-muted-foreground mt-1">Group your links under campaigns to track performance</p>
+          <button
+            onClick={() => { setEditing(null); setShowForm(true); }}
+            className="mt-5 inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            <Plus className="h-4 w-4" /> Create Campaign
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -75,47 +132,97 @@ export default function Campaigns() {
             const campaignLinks = links.filter((l) => l.campaign_id === campaign.id);
             const totalClicks = campaignLinks.reduce((sum, l) => sum + (l.total_clicks || 0), 0);
             const totalConversions = campaignLinks.reduce((sum, l) => sum + (l.conversions || 0), 0);
+            const ctr = campaignLinks.length > 0 && totalClicks > 0
+              ? Math.round((totalConversions / totalClicks) * 100)
+              : 0;
+
             return (
-              <Link
-                key={campaign.id}
-                to={`/campaigns/${campaign.id}`}
-                className="bg-card rounded-xl border border-border p-5 hover:shadow-md transition-shadow group"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold">{campaign.name}</h3>
-                    {campaign.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{campaign.description}</p>
-                    )}
+              <div key={campaign.id} className="group bg-card rounded-2xl border border-border hover:border-primary/30 hover:shadow-md transition-all duration-200 flex flex-col">
+                {/* Card Header */}
+                <div className="p-5 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                        <Megaphone className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{campaign.name}</h3>
+                        {campaign.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{campaign.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <CampaignStatusBadge status={campaign.status} />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="p-1.5 rounded-lg hover:bg-secondary transition-colors opacity-0 group-hover:opacity-100"
+                            onClick={(e) => e.preventDefault()}
+                          >
+                            <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onClick={(e) => { e.preventDefault(); setEditing(campaign); setShowForm(true); }}>
+                            <Edit className="h-3.5 w-3.5 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={(e) => { e.preventDefault(); deleteCampaign(campaign.id); }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                  <span
-                    className={cn(
-                      "text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider",
-                      campaign.status === "active"
-                        ? "bg-emerald-50 text-emerald-600"
-                        : campaign.status === "paused"
-                        ? "bg-amber-50 text-amber-600"
-                        : "bg-secondary text-muted-foreground"
-                    )}
-                  >
-                    {campaign.status}
-                  </span>
+
+                  {/* Dates */}
+                  {(campaign.start_date || campaign.end_date) && (
+                    <div className="flex items-center gap-1.5 mt-3 text-[11px] text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        {campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : "—"}
+                        {" → "}
+                        {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString() : "Ongoing"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-border">
+                    <div className="text-center">
+                      <p className="text-lg font-bold">{campaignLinks.length}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                        <Link2 className="h-2.5 w-2.5" /> Links
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold">{totalClicks.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                        <MousePointerClick className="h-2.5 w-2.5" /> Clicks
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold">{totalConversions}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                        <BarChart3 className="h-2.5 w-2.5" /> Conv.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border">
-                  <div>
-                    <p className="text-lg font-bold">{campaignLinks.length}</p>
-                    <p className="text-[10px] text-muted-foreground">Links</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold">{totalClicks}</p>
-                    <p className="text-[10px] text-muted-foreground">Clicks</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold">{totalConversions}</p>
-                    <p className="text-[10px] text-muted-foreground">Conversions</p>
-                  </div>
-                </div>
-              </Link>
+
+                {/* Card Footer */}
+                <Link
+                  to={`/campaigns/${campaign.id}`}
+                  className="flex items-center justify-between px-5 py-3 border-t border-border rounded-b-2xl text-xs font-medium text-muted-foreground hover:text-primary hover:bg-muted/30 transition-colors"
+                >
+                  <span>View details</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             );
           })}
         </div>
@@ -129,6 +236,21 @@ export default function Campaigns() {
         />
       )}
     </div>
+  );
+}
+
+function CampaignStatusBadge({ status }) {
+  const map = {
+    active: { label: "Active", dot: "bg-emerald-500", cls: "bg-emerald-50 text-emerald-700" },
+    paused: { label: "Paused", dot: "bg-amber-500", cls: "bg-amber-50 text-amber-600" },
+    completed: { label: "Done", dot: "bg-gray-400", cls: "bg-gray-100 text-gray-600" },
+  };
+  const s = map[status] || { label: status, dot: "bg-gray-400", cls: "bg-gray-100 text-gray-600" };
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider", s.cls)}>
+      <span className={cn("w-1.5 h-1.5 rounded-full", s.dot)} />
+      {s.label}
+    </span>
   );
 }
 
