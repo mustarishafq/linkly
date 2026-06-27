@@ -1,5 +1,5 @@
 ---
-description: Before finishing changes, verify EMZI Nexus docs (UI, integrations, deploy)
+description: Finish checklist — cleanup changes, verify EMZI Nexus docs, suggest improvements
 alwaysApply: true
 ---
 
@@ -34,6 +34,22 @@ When completing **any** task that touches UI, API, auth, integrations, or deploy
 
 - [ ] Split domains: `VITE_API_BASE_URL` points to API host (`docs/REACT_SPA_APACHE_HTACCESS.md`)
 
+## Cleanup before marking complete
+
+Always tidy every change made in the session — do not leave partial or exploratory edits behind.
+
+- [ ] Remove debug code: `console.log`, `dd()`, `dump()`, temporary breakpoints, commented-out blocks
+- [ ] Delete unused imports, variables, functions, and files introduced during the task
+- [ ] Revert scratch/experimental edits that are not part of the delivered solution
+- [ ] Match surrounding style: naming, formatting, and patterns in touched files
+- [ ] Run linter on edited files; fix new issues introduced by the change
+- [ ] Confirm no secrets, `.env` values, or one-off test data were added to tracked files
+
+If cleanup reveals scope creep, trim the diff to what the task actually requires.
+
 ## Report format
 
-If checks apply, end with a short **Compliance** note: what was verified or what still needs manual QA. Skip if the change was docs-only or unrelated (e.g. typo in a comment).
+End every completed task with two short sections (skip **Compliance** for docs-only or unrelated changes):
+
+1. **Compliance** — what was verified against `docs/README.md` or what still needs manual QA
+2. **Improvements** — concrete, optional follow-ups spotted while working (refactors, tests, perf, UX, docs, tech debt). Keep actionable; do not block delivery on items outside the request

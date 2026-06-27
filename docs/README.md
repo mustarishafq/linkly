@@ -98,6 +98,33 @@ When implementing a feature, match the **portable spec** first, then compare aga
 
 ---
 
+## Finish checklist (PR / agent)
+
+Before marking work complete — whether you ship a PR or use Cursor — run through this list. Cursor agents follow the same rules in [`.cursor/rules/emzi-nexus-compliance.mdc`](../.cursor/rules/emzi-nexus-compliance.mdc).
+
+### Cleanup
+
+Tidy every change; do not leave partial or exploratory edits in the diff.
+
+- Remove debug code (`console.log`, `dd()`, `dump()`, commented-out blocks)
+- Delete unused imports, variables, functions, and files introduced for the task
+- Revert scratch edits that are not part of the delivered solution
+- Match naming, formatting, and patterns in touched files
+- Run the linter on edited files; fix new issues you introduced
+- Confirm no secrets, `.env` values, or one-off test data were added to tracked files
+
+If cleanup reveals scope creep, trim the diff to what the task actually requires.
+
+### Compliance
+
+Verify against the **Consistency rules** table above and the linked spec for your change area (UI → DESIGN_TEMPLATE §28; integrations → the matching setup doc).
+
+### Improvements (optional note)
+
+In the PR description or agent summary, add a short **Improvements** list: concrete follow-ups you noticed (refactors, tests, perf, UX, docs, tech debt). Keep items actionable; they should not block shipping the current change.
+
+---
+
 ## Updating docs
 
 When shared patterns change in the canonical frontend or integration APIs:
