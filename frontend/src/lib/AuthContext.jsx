@@ -87,16 +87,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = (shouldRedirect = true) => {
+    if (shouldRedirect && typeof window !== "undefined") {
+      const ssoReturnTo = consumeSsoReturnTo();
+      const destination = ssoReturnTo ? getNexusBrainLogoutUrl(ssoReturnTo) : "/login";
+      db.auth.logout();
+      window.location.replace(destination);
+      return;
+    }
+
     setUser(null);
     setIsAuthenticated(false);
     db.auth.logout();
-
-    if (shouldRedirect && typeof window !== "undefined") {
-      const ssoReturnTo = consumeSsoReturnTo();
-      window.location.assign(
-        ssoReturnTo ? getNexusBrainLogoutUrl(ssoReturnTo) : "/login"
-      );
-    }
   };
 
   const navigateToLogin = () => {
