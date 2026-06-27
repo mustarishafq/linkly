@@ -612,7 +612,10 @@ Vite proxies `/api` to Laravel during development (see `frontend/vite.config.js`
 ```bash
 npm run migrate
 npm run seed
+cd backend && php artisan storage:link && cd ..
 ```
+
+`storage:link` exposes uploaded files (e.g. QR logos) at `/storage/...` on the API host. Required for logo uploads in production.
 
 This creates all tables (integer PKs) and seeds:
 
@@ -710,7 +713,7 @@ API: `GET` / `PATCH /api/settings` (admin JWT required). Secrets are redacted on
 | `BRAND_PRIMARY` | Default teal brand color (overridable in General settings) |
 | `DOMAIN_VERIFY_PREFIX` | DNS TXT prefix for custom domain verification (default `_linkly`) |
 | `JWT_SECRET` | Signing key for session tokens — must be strong in production |
-| `FRONTEND_URL` | CORS allowed origin(s), comma-separated |
+| `FRONTEND_URL` | CORS allowed origin(s) for `/api/*`, comma-separated |
 
 ---
 
@@ -879,7 +882,9 @@ APP_BASE_URL=https://linkly.emzinexus.com
 FRONTEND_URL=https://linkly.emzinexus.com
 ```
 
-Then run `php artisan config:clear`. `FRONTEND_URL` controls CORS for browser requests from the SPA origin.
+Then run `php artisan config:clear`. `FRONTEND_URL` controls CORS for browser requests from the SPA origin on `/api/*`.
+
+On **split domains**, uploaded QR logos are served from `APP_URL/storage/...`. The API must allow cross-origin access to those static files (Apache: `mod_headers` + repo `.htaccess` rules) and have `php artisan storage:link` run once. See [REACT_SPA_APACHE_HTACCESS.md § Uploaded logos](./REACT_SPA_APACHE_HTACCESS.md#uploaded-logos-and-storage-split-domains).
 
 ### Production checklist
 
@@ -888,6 +893,7 @@ Then run `php artisan config:clear`. `FRONTEND_URL` controls CORS for browser re
 [ ] Deployed dist/ includes hidden files (.htaccess)
 [ ] Split domains: VITE_API_BASE_URL points to API host (not /api on SPA host)
 [ ] Split domains: backend FRONTEND_URL matches SPA origin
+[ ] API server: php artisan storage:link; CORS on /storage/* for QR logos — REACT_SPA_APACHE_HTACCESS.md
 [ ] Laravel: strong JWT_SECRET, APP_DEBUG=false, SMTP configured
 [ ] php artisan migrate --force on API server
 [ ] Direct URL test: /login loads (not 404)
@@ -920,6 +926,8 @@ For symptom → fix tables (404 on routes, HTML from API, CORS errors), see [REA
 
 - Set strong `JWT_SECRET`, disable `APP_DEBUG`, configure SMTP in `backend/.env`.
 - Run migrations on deploy: `cd backend && php artisan migrate --force`.
+- Run once per API deploy: `cd backend && php artisan storage:link` (serves uploaded logos at `/storage/...`).
+- Split domains: ensure CORS headers on `/storage/*` (repo `.htaccess` + Apache `mod_headers`, or Nginx `add_header`) — see [REACT_SPA_APACHE_HTACCESS.md](./REACT_SPA_APACHE_HTACCESS.md#uploaded-logos-and-storage-split-domains).
 
 ---
 

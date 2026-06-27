@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'paths' => ['api/*'],
+    'paths' => ['api/*', 'storage/*'],
     'allowed_methods' => ['*'],
     'allowed_origins' => array_values(array_filter(array_map(
         'trim',

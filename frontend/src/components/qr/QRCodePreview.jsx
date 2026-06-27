@@ -52,25 +52,29 @@ function isDirectLogoUrl(url) {
   return url.startsWith("blob:") || url.startsWith("data:");
 }
 
-async function tryLoadLogoCandidate(url) {
-  if (isDirectLogoUrl(url)) {
-    await loadImage(url);
-    return url;
+function needsCorsProxy(url) {
+  if (isDirectLogoUrl(url) || typeof window === "undefined") {
+    return false;
   }
 
   try {
-    await loadImage(url);
-    return url;
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin !== window.location.origin;
   } catch {
-    const proxied = toProxyImageUrl(url);
-    await loadImage(proxied);
-    return proxied;
+    return false;
   }
+}
+
+async function tryLoadLogoCandidate(url) {
+  const loadUrl = needsCorsProxy(url) ? toProxyImageUrl(url) : url;
+  await loadImage(loadUrl);
+  return loadUrl;
 }
 
 function loadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(url);
     img.onerror = reject;
     img.src = url;

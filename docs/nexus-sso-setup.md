@@ -176,7 +176,7 @@ Optional query parameters:
 | Param | Description |
 |-------|-------------|
 | `redirect_to` | Preferred post-login path within this app (e.g. `/bookings`) |
-| `return_to` | Where to send the user after they sign out — a Nexus Brain path (e.g. `/dashboard`) or full URL (e.g. `https://emzinexus.com/dashboard`). Stored in the browser for the session. |
+| `return_to` | Where to send the user after they sign out — a Nexus Brain path (e.g. `/applications`) or full URL on the same origin (e.g. `https://emzinexus.com/applications`). Relative paths are preferred. Stored in the browser for the session. |
 
 The JWT payload may also include `redirect_to` and `return_to` claims; the server sanitizes both before responding.
 
@@ -195,11 +195,12 @@ Launch with return_to   ──►   GET /sso/nexus?token=…&return_to=/dashboar
                               Store return_to (sessionStorage)
                               Sign user in, redirect to redirect_to
                                       │
-User clicks Sign out    ──►   Clear local session
+User clicks Sign out    ──►   Navigate to Nexus (before React re-render)
                                       │
                                       ▼
-                              Redirect to Nexus Brain:
-                              {VITE_NEXUS_BRAIN_URL}?return_to=<stored value>
+                              Clear local session, redirect to Nexus Brain:
+                              {VITE_NEXUS_BRAIN_URL}/applications
+                              (or full stored return_to URL on same origin)
 ```
 
 ### How `return_to` is validated
@@ -216,15 +217,18 @@ Implementation: `backend/app/Services/SsoRedirectService.php` (`sanitizeReturnTo
 ### Frontend storage and logout
 
 1. **`/sso/nexus`** reads `return_to` from the query string and from the verify API response, then stores it in `sessionStorage` (`frontend/src/lib/ssoRedirect.js`).
-2. **Sign out** (top bar or mobile menu) consumes that value and redirects via `getNexusBrainLogoutUrl()` (`frontend/src/lib/nexusBrain.js`), which navigates to:
+2. **Sign out** (top bar or mobile menu) consumes that value and redirects via `getNexusBrainLogoutUrl()` (`frontend/src/lib/nexusBrain.js`). Navigation runs **before** React auth state is cleared so the login page does not flash briefly (`frontend/src/lib/AuthContext.jsx`).
+3. **Logout URL resolution** (`getNexusBrainLogoutUrl`):
 
-   ```
-   https://<VITE_NEXUS_BRAIN_URL>?return_to=<encoded return_to>
-   ```
+   | Stored `return_to` | Sign-out destination |
+   |--------------------|----------------------|
+   | `/applications` (relative Nexus path) | `https://<VITE_NEXUS_BRAIN_URL>/applications` |
+   | `https://emzinexus.com/applications` (full URL on Nexus origin) | `https://emzinexus.com/applications` |
+   | Other / unrecognized | `https://<VITE_NEXUS_BRAIN_URL>?return_to=<encoded value>` (legacy fallback) |
 
-3. If no `return_to` was stored (e.g. password login), sign-out falls back to `/login`.
+   Prefer passing a **relative Nexus path** (e.g. `/applications`) from Nexus Brain on SSO launch — that is the most reliable format.
 
-Nexus Brain is responsible for handling the `return_to` query parameter on its side after the user lands there.
+4. If no `return_to` was stored (e.g. password login), sign-out falls back to `/login`.
 
 ---
 
@@ -239,7 +243,7 @@ VITE_API_URL=https://api.booking.example.com/api
 
 | Variable | Purpose |
 |----------|---------|
-| `VITE_NEXUS_BRAIN_URL` | Target for “Continue with EMZI Nexus Brain” on the login page, and the base URL used on SSO sign-out (`?return_to=…`). Default if unset: `https://emzinexus.com` (`frontend/src/lib/nexusBrain.js`). |
+| `VITE_NEXUS_BRAIN_URL` | Target for “Continue with EMZI Nexus Brain” on the login page, and the base URL used to resolve SSO sign-out destinations. Default if unset: `https://emzinexus.com` (`frontend/src/lib/nexusBrain.js`). |
 | `VITE_API_URL` | Backend API base used by the SSO landing page. Leave blank in dev to use Vite’s `/api` proxy. |
 
 This does **not** configure inbound SSO verification; that is entirely the backend `nexus_sso` setting.
@@ -335,6 +339,8 @@ Verify endpoint is rate-limited to **10 requests/minute** per IP.
 | `User account is not active` | User not approved in Booking | Approve user in **Users** |
 | Blank page at `/sso/nexus` | SPA not configured for client routing | Add Apache `.htaccess` — see [REACT_SPA_APACHE_HTACCESS.md](./REACT_SPA_APACHE_HTACCESS.md) |
 | Sign out goes to `/login` instead of Nexus | `return_to` missing, rejected, or issuer not configured | Pass `return_to` from Nexus on SSO launch; set **Expected Issuer URL** to the Nexus Brain base URL; ensure `VITE_NEXUS_BRAIN_URL` matches |
+| Sign out lands on Nexus root with `?return_to=` in the URL | Nexus passed a full absolute URL and an older build used query-param-only logout | Rebuild frontend; prefer relative paths like `/applications` on SSO launch; current builds navigate directly to Nexus paths/URLs on the same origin |
+| Brief flash of login page on SSO sign-out | React auth state cleared before navigation (fixed in current builds) | Rebuild frontend; logout now calls `window.location.replace()` before clearing auth state |
 | API errors from SSO page | Wrong `VITE_API_URL` or CORS | Set `VITE_API_URL` and backend `FRONTEND_URL` for production |
 
 ---

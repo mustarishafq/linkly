@@ -115,7 +115,7 @@ FRONTEND_URL=https://linkly.emzinexus.com
 ```
 
 - `APP_URL` — public URL of the Laravel API
-- `FRONTEND_URL` — allowed browser origin(s) for CORS (comma-separated if multiple)
+- `FRONTEND_URL` — allowed browser origin(s) for CORS on `/api/*` (comma-separated if multiple)
 - `APP_BASE_URL` — used for links/emails pointing back to the SPA
 
 After changing backend env:
@@ -123,6 +123,46 @@ After changing backend env:
 ```bash
 php artisan config:clear
 ```
+
+### Uploaded logos and `/storage/*` (split domains)
+
+QR code logos are uploaded to the API and served from `https://your-api.example.com/storage/logos/...`. On split domains the SPA loads those images cross-origin (for canvas export), so the API host must expose CORS on static storage files — not only on `/api/*`.
+
+**One-time on the API server** (after deploy or first clone):
+
+```bash
+cd backend
+php artisan storage:link
+```
+
+This creates `public/storage` → `storage/app/public`. Without it, logo URLs return 404.
+
+**Repo defaults (Apache):**
+
+- `backend/public/.htaccess` — sets `Access-Control-Allow-Origin` for `/storage/*`
+- `backend/storage/app/public/.htaccess` — same headers for files under the symlink target
+- `backend/config/cors.php` — includes `storage/*` when requests are handled by Laravel
+
+Ensure Apache **`mod_headers`** is enabled. After changing backend env or CORS config, run `php artisan config:clear`.
+
+**Nginx** — add CORS on the storage location (example):
+
+```nginx
+location /storage/ {
+    add_header Access-Control-Allow-Origin *;
+    try_files $uri $uri/ =404;
+}
+```
+
+The frontend also proxies cross-origin logo URLs through `GET /api/image-proxy` when needed (see `frontend/src/components/qr/QRCodePreview.jsx`). Rebuild the SPA after frontend changes: `npm run build`.
+
+**Verify storage CORS:**
+
+```bash
+curl -sSI "https://linklyapi.emzinexus.com/storage/logos/example.png" | grep -i access-control
+```
+
+Expect `Access-Control-Allow-Origin: *` (or your SPA origin). A missing header causes browser errors like *No 'Access-Control-Allow-Origin' header* when editing QR designs with uploaded logos.
 
 ### Same-origin alternative (optional)
 
@@ -176,6 +216,8 @@ Copy this block into new project README or deployment notes:
 [ ] Vite build script copies .htaccess into dist/ after vite build
 [ ] Split domains: frontend/.env sets VITE_API_BASE_URL to API host (not /api on SPA host)
 [ ] Split domains: backend FRONTEND_URL matches SPA origin for CORS
+[ ] API server: php artisan storage:link (logo uploads served from /storage/)
+[ ] API server: Apache mod_headers enabled (CORS on /storage/* for QR logos)
 [ ] npm run build completed successfully
 [ ] dist/ or build/ contains .htaccess alongside index.html
 [ ] Uploaded deploy folder includes hidden files (.htaccess)
@@ -204,6 +246,7 @@ Copy this block into new project README or deployment notes:
 | 404 on `/login` but `/` works | Missing or not deployed `.htaccess` | Rebuild (`npm run build`), confirm `dist/.htaccess` exists, redeploy including hidden files |
 | Login or API calls return HTML | `VITE_API_BASE_URL=/api` on split domains; SPA `.htaccess` serves `index.html` for `/api/*` | Set `VITE_API_BASE_URL=https://your-api.example.com/api` in `frontend/.env`, rebuild, redeploy |
 | CORS error calling API | Backend `FRONTEND_URL` missing or wrong | Set `FRONTEND_URL=https://your-spa.example.com` in `backend/.env`, run `php artisan config:clear` |
+| CORS error loading `/storage/logos/...` (QR logo) | Split domains: static files lack CORS headers, or `storage:link` missing | Run `php artisan storage:link`; confirm `backend/public/.htaccess` deployed; enable `mod_headers`; see [Uploaded logos and `/storage/*`](#uploaded-logos-and-storage-split-domains) |
 | 404 on all routes including `/` | Wrong document root | Point vhost to `dist/` / `build/` folder |
 | Blank page, assets 404 | Wrong `base` path or assets uploaded to wrong folder | Align Vite `base` with URL path; deploy full `dist/` |
 | 500 Internal Server Error | `mod_rewrite` off or bad `.htaccess` syntax | Check Apache error log; confirm `RewriteEngine On` |

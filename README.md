@@ -127,13 +127,14 @@ APP_BASE_URL=https://linkly.emzinexus.com
 FRONTEND_URL=https://linkly.emzinexus.com
 ```
 
-`FRONTEND_URL` is used for CORS; the browser must be allowed to call the API from the SPA origin.
+`FRONTEND_URL` is used for CORS on `/api/*`; the browser must be allowed to call the API from the SPA origin. Uploaded QR logos are served from `/storage/*` on the API host — on split domains you also need `php artisan storage:link` and CORS on static storage (see [docs/REACT_SPA_APACHE_HTACCESS.md](docs/REACT_SPA_APACHE_HTACCESS.md#uploaded-logos-and-storage-split-domains)).
 
 ### Deploy
 
 - Build frontend: `npm run build` (output in `frontend/dist`)
 - Deploy **`frontend/dist/`** to the frontend web root, including **`.htaccess`** (see [docs/REACT_SPA_APACHE_HTACCESS.md](docs/REACT_SPA_APACHE_HTACCESS.md) for `.htaccess` and split-domain API setup)
 - Deploy Laravel `backend/` with document root `backend/public` on the API host
+- On the API server: `php artisan storage:link` (once) so logo uploads are reachable at `/storage/logos/...`
 
 ## API
 
