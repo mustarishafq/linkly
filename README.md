@@ -101,6 +101,7 @@ npm run dev:api        # Laravel API only
 ## Production
 
 - Build frontend: `npm run build` (output in `frontend/dist`)
+- Deploy **`frontend/dist/`** to your web root, including **`.htaccess`** (required for React Router on Apache — see [docs/REACT_SPA_APACHE_HTACCESS.md](docs/REACT_SPA_APACHE_HTACCESS.md))
 - Serve API: `cd backend && php artisan serve` or configure PHP-FPM/Nginx
 - Point `VITE_API_BASE_URL` at your API `/api` path in production builds
 

@@ -285,7 +285,7 @@ Verify endpoint is rate-limited to **10 requests/minute** per IP.
 | `Token has expired` | JWT `exp` in the past | Nexus must issue fresh tokens |
 | `Token missing sub claim` | No Nexus user ID in JWT | Nexus must include `sub` |
 | `User account is not active` | User not approved in Booking | Approve user in **Users** |
-| Blank page at `/sso/nexus` | SPA not configured for client routing | Ensure web server serves `index.html` for unknown paths |
+| Blank page at `/sso/nexus` | SPA not configured for client routing | Add Apache `.htaccess` — see [REACT_SPA_APACHE_HTACCESS.md](./REACT_SPA_APACHE_HTACCESS.md) |
 | API errors from SSO page | Wrong `VITE_API_URL` or CORS | Set `VITE_API_URL` and backend `FRONTEND_URL` for production |
 
 ---
