@@ -106,19 +106,18 @@ Example: frontend `linkly.emzinexus.com`, API `linklyapi.emzinexus.com`.
 
 **Do not** use `VITE_API_BASE_URL=/api` in production when the frontend and API are on different domains — the SPA `.htaccess` will return `index.html` for `/api/*` and login will fail with HTML instead of JSON.
 
-**Frontend** — before building:
+**Frontend** — set `frontend/.env` before building:
 
 ```bash
-cp frontend/.env.production.example frontend/.env.production
-# edit VITE_API_BASE_URL if your API host differs
+# frontend/.env — production values
+VITE_API_BASE_URL=https://linklyapi.emzinexus.com/api
+VITE_NEXUS_BRAIN_URL=https://emzinexus.com
+VITE_APP_TIMEZONE=UTC
+
 npm run build
 ```
 
-`frontend/.env.production` must include:
-
-```bash
-VITE_API_BASE_URL=https://linklyapi.emzinexus.com/api
-```
+Vite reads `frontend/.env` at build time. Switch back to `VITE_API_BASE_URL=/api` for local dev.
 
 **Backend** — in `backend/.env`:
 

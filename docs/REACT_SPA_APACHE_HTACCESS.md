@@ -85,32 +85,24 @@ Symptoms after login: dashboard fails to load, Network tab shows `200` with `tex
 | Frontend (SPA) | `https://linkly.emzinexus.com` |
 | Backend (Laravel API) | `https://linklyapi.emzinexus.com` |
 
-### Frontend — set API URL before build
+### Frontend — set API URL in `.env` before build
 
 **Do not** deploy a build that still uses `/api` on the SPA domain.
 
-1. Copy the production env template:
+Edit `frontend/.env` with production values, then build and deploy `frontend/dist/` to the **frontend** host only:
 
 ```bash
-cp frontend/.env.production.example frontend/.env.production
-```
-
-2. Set the full API base URL (include `/api` — Laravel mounts routes under that prefix):
-
-```bash
-# frontend/.env.production
+# frontend/.env
 VITE_APP_TIMEZONE=UTC
 VITE_API_BASE_URL=https://linklyapi.emzinexus.com/api
 VITE_NEXUS_BRAIN_URL=https://emzinexus.com
-```
 
-3. Build and deploy `frontend/dist/` to the **frontend** host only:
-
-```bash
 npm run build
 ```
 
 Vite bakes `VITE_*` values into the JS bundle at build time — changing server env after deploy does nothing until you rebuild.
+
+For **local dev**, use `VITE_API_BASE_URL=/api` and `VITE_DEV_API_TARGET=http://127.0.0.1:8787` in the same file.
 
 ### Backend — CORS and app URLs
 
@@ -182,7 +174,7 @@ Copy this block into new project README or deployment notes:
 [ ] React Router uses BrowserRouter (not HashRouter unless intentional)
 [ ] .htaccess template at frontend/.htaccess (Vite) or public/.htaccess (CRA)
 [ ] Vite build script copies .htaccess into dist/ after vite build
-[ ] Split domains: frontend/.env.production sets VITE_API_BASE_URL to API host (not /api on SPA host)
+[ ] Split domains: frontend/.env sets VITE_API_BASE_URL to API host (not /api on SPA host)
 [ ] Split domains: backend FRONTEND_URL matches SPA origin for CORS
 [ ] npm run build completed successfully
 [ ] dist/ or build/ contains .htaccess alongside index.html
@@ -210,7 +202,7 @@ Copy this block into new project README or deployment notes:
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | 404 on `/login` but `/` works | Missing or not deployed `.htaccess` | Rebuild (`npm run build`), confirm `dist/.htaccess` exists, redeploy including hidden files |
-| Login or API calls return HTML | `VITE_API_BASE_URL=/api` on split domains; SPA `.htaccess` serves `index.html` for `/api/*` | Set `VITE_API_BASE_URL=https://your-api.example.com/api` in `frontend/.env.production`, rebuild, redeploy |
+| Login or API calls return HTML | `VITE_API_BASE_URL=/api` on split domains; SPA `.htaccess` serves `index.html` for `/api/*` | Set `VITE_API_BASE_URL=https://your-api.example.com/api` in `frontend/.env`, rebuild, redeploy |
 | CORS error calling API | Backend `FRONTEND_URL` missing or wrong | Set `FRONTEND_URL=https://your-spa.example.com` in `backend/.env`, run `php artisan config:clear` |
 | 404 on all routes including `/` | Wrong document root | Point vhost to `dist/` / `build/` folder |
 | Blank page, assets 404 | Wrong `base` path or assets uploaded to wrong folder | Align Vite `base` with URL path; deploy full `dist/` |
@@ -234,5 +226,5 @@ Copy this block into new project README or deployment notes:
 
 **Env files**
 
-- Frontend production template: `frontend/.env.production.example` → copy to `frontend/.env.production` before build
-- Backend production vars: see `backend/.env.example` ( `APP_URL`, `FRONTEND_URL`, `APP_BASE_URL` )
+- Frontend: `frontend/.env` — set `VITE_API_BASE_URL` before `npm run build` (see `frontend/.env.example`)
+- Backend production vars: see `backend/.env.example` (`APP_URL`, `FRONTEND_URL`, `APP_BASE_URL`)
