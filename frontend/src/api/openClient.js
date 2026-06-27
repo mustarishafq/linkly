@@ -27,6 +27,35 @@ function setToken(token) {
   }
 }
 
+function htmlApiMisconfigMessage() {
+  return (
+    "API returned HTML instead of JSON. In production, set VITE_API_BASE_URL to your backend " +
+    "(e.g. https://linklyapi.emzinexus.com/api) and rebuild the frontend — not /api on the SPA host."
+  );
+}
+
+/**
+ * @param {Response} response
+ */
+async function readJsonResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
+    throw new Error(htmlApiMisconfigMessage());
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Unexpected response from API (${response.status})`);
+  }
+}
+
 /**
  * @param {string} path
  * @param {RequestInit} [options]
@@ -48,8 +77,11 @@ async function request(path, options = {}) {
   if (!response.ok) {
     let payload = null;
     try {
-      payload = await response.json();
-    } catch {
+      payload = await readJsonResponse(response);
+    } catch (error) {
+      if (error instanceof Error && error.message === htmlApiMisconfigMessage()) {
+        throw error;
+      }
       payload = null;
     }
     const error = new Error(payload?.message || `Request failed: ${response.status}`);
@@ -60,7 +92,7 @@ async function request(path, options = {}) {
     throw error;
   }
 
-  return response.json();
+  return readJsonResponse(response);
 }
 
 /**
@@ -84,8 +116,11 @@ async function uploadRequest(path, formData) {
   if (!response.ok) {
     let payload = null;
     try {
-      payload = await response.json();
-    } catch {
+      payload = await readJsonResponse(response);
+    } catch (error) {
+      if (error instanceof Error && error.message === htmlApiMisconfigMessage()) {
+        throw error;
+      }
       payload = null;
     }
     const error = new Error(payload?.message || `Upload failed: ${response.status}`);
@@ -96,7 +131,7 @@ async function uploadRequest(path, formData) {
     throw error;
   }
 
-  return response.json();
+  return readJsonResponse(response);
 }
 
 /** @param {string} entityName */

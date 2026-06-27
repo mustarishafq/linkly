@@ -100,10 +100,41 @@ npm run dev:api        # Laravel API only
 
 ## Production
 
+### Split domains (SPA + API on different hosts)
+
+Example: frontend `linkly.emzinexus.com`, API `linklyapi.emzinexus.com`.
+
+**Do not** use `VITE_API_BASE_URL=/api` in production when the frontend and API are on different domains — the SPA `.htaccess` will return `index.html` for `/api/*` and login will fail with HTML instead of JSON.
+
+**Frontend** — before building:
+
+```bash
+cp frontend/.env.production.example frontend/.env.production
+# edit VITE_API_BASE_URL if your API host differs
+npm run build
+```
+
+`frontend/.env.production` must include:
+
+```bash
+VITE_API_BASE_URL=https://linklyapi.emzinexus.com/api
+```
+
+**Backend** — in `backend/.env`:
+
+```bash
+APP_URL=https://linklyapi.emzinexus.com
+APP_BASE_URL=https://linkly.emzinexus.com
+FRONTEND_URL=https://linkly.emzinexus.com
+```
+
+`FRONTEND_URL` is used for CORS; the browser must be allowed to call the API from the SPA origin.
+
+### Deploy
+
 - Build frontend: `npm run build` (output in `frontend/dist`)
-- Deploy **`frontend/dist/`** to your web root, including **`.htaccess`** (required for React Router on Apache — see [docs/REACT_SPA_APACHE_HTACCESS.md](docs/REACT_SPA_APACHE_HTACCESS.md))
-- Serve API: `cd backend && php artisan serve` or configure PHP-FPM/Nginx
-- Point `VITE_API_BASE_URL` at your API `/api` path in production builds
+- Deploy **`frontend/dist/`** to the frontend web root, including **`.htaccess`** (see [docs/REACT_SPA_APACHE_HTACCESS.md](docs/REACT_SPA_APACHE_HTACCESS.md) for `.htaccess` and split-domain API setup)
+- Deploy Laravel `backend/` with document root `backend/public` on the API host
 
 ## API
 

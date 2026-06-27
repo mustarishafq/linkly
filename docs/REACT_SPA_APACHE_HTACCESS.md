@@ -62,6 +62,94 @@ Required modules (normally present):
 
 ---
 
+## Split domains (SPA + API on different hosts)
+
+When the React app and Laravel API live on **different subdomains**, you must point the frontend build at the API host. Using the local dev default `VITE_API_BASE_URL=/api` in production will break auth and data loading.
+
+### Why login returns HTML instead of JSON
+
+With `.htaccess` in place, any request to the **frontend** host that is not a real file falls back to `index.html`:
+
+| Request | Host | Result |
+|---------|------|--------|
+| `GET /login` | `linkly.emzinexus.com` | `index.html` — correct (React Router handles `/login`) |
+| `POST /api/auth/login` | `linkly.emzinexus.com` | `index.html` — **wrong** (API expected JSON) |
+| `POST /api/auth/login` | `linklyapi.emzinexus.com` | JSON — correct |
+
+Symptoms after login: dashboard fails to load, Network tab shows `200` with `text/html` on `/api/*` requests, or errors like “API returned HTML instead of JSON”.
+
+### Linkly production example
+
+| Role | URL |
+|------|-----|
+| Frontend (SPA) | `https://linkly.emzinexus.com` |
+| Backend (Laravel API) | `https://linklyapi.emzinexus.com` |
+
+### Frontend — set API URL before build
+
+**Do not** deploy a build that still uses `/api` on the SPA domain.
+
+1. Copy the production env template:
+
+```bash
+cp frontend/.env.production.example frontend/.env.production
+```
+
+2. Set the full API base URL (include `/api` — Laravel mounts routes under that prefix):
+
+```bash
+# frontend/.env.production
+VITE_APP_TIMEZONE=UTC
+VITE_API_BASE_URL=https://linklyapi.emzinexus.com/api
+VITE_NEXUS_BRAIN_URL=https://emzinexus.com
+```
+
+3. Build and deploy `frontend/dist/` to the **frontend** host only:
+
+```bash
+npm run build
+```
+
+Vite bakes `VITE_*` values into the JS bundle at build time — changing server env after deploy does nothing until you rebuild.
+
+### Backend — CORS and app URLs
+
+In `backend/.env` on the **API** server:
+
+```bash
+APP_URL=https://linklyapi.emzinexus.com
+APP_BASE_URL=https://linkly.emzinexus.com
+FRONTEND_URL=https://linkly.emzinexus.com
+```
+
+- `APP_URL` — public URL of the Laravel API
+- `FRONTEND_URL` — allowed browser origin(s) for CORS (comma-separated if multiple)
+- `APP_BASE_URL` — used for links/emails pointing back to the SPA
+
+After changing backend env:
+
+```bash
+php artisan config:clear
+```
+
+### Same-origin alternative (optional)
+
+If you prefer `VITE_API_BASE_URL=/api` in production, serve **both** SPA and API from one domain (e.g. Nginx/Apache proxies `/api` to Laravel and everything else to `index.html`). That avoids cross-origin CORS but is a server config choice — not the default for split subdomains.
+
+### Verify API URL after deploy
+
+```bash
+# Should return application/json (e.g. 401), not text/html
+curl -sS -o /dev/null -w "%{http_code} %{content_type}\n" \
+  -X POST https://linklyapi.emzinexus.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"wrong"}'
+```
+
+In the browser DevTools → Network, login should call `https://linklyapi.emzinexus.com/api/auth/login`, not `https://linkly.emzinexus.com/api/...`.
+
+---
+
 ## Subpath deployment (app not at domain root)
 
 If the app lives at `https://example.com/myapp/` instead of the root:
@@ -94,11 +182,14 @@ Copy this block into new project README or deployment notes:
 [ ] React Router uses BrowserRouter (not HashRouter unless intentional)
 [ ] .htaccess template at frontend/.htaccess (Vite) or public/.htaccess (CRA)
 [ ] Vite build script copies .htaccess into dist/ after vite build
+[ ] Split domains: frontend/.env.production sets VITE_API_BASE_URL to API host (not /api on SPA host)
+[ ] Split domains: backend FRONTEND_URL matches SPA origin for CORS
 [ ] npm run build completed successfully
 [ ] dist/ or build/ contains .htaccess alongside index.html
 [ ] Uploaded deploy folder includes hidden files (.htaccess)
 [ ] Direct URL test: /login loads (not 404)
 [ ] Refresh test: open /dashboard, press F5 — still loads
+[ ] Login test: /api/* requests go to API subdomain and return JSON
 [ ] Static assets load: check Network tab for 200 on *.js and *.css
 ```
 
@@ -110,6 +201,7 @@ Copy this block into new project README or deployment notes:
 2. Open `https://your-domain.com/login` directly — should show the login page, not Apache 404.
 3. Log in, go to an inner route, **refresh** — should stay on that route.
 4. In DevTools → Network, confirm JS/CSS requests return **200** (rewrite rules must not swallow asset paths).
+5. Log in and confirm API calls hit your **API host** (e.g. `linklyapi.emzinexus.com/api/...`) and return JSON.
 
 ---
 
@@ -118,6 +210,8 @@ Copy this block into new project README or deployment notes:
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | 404 on `/login` but `/` works | Missing or not deployed `.htaccess` | Rebuild (`npm run build`), confirm `dist/.htaccess` exists, redeploy including hidden files |
+| Login or API calls return HTML | `VITE_API_BASE_URL=/api` on split domains; SPA `.htaccess` serves `index.html` for `/api/*` | Set `VITE_API_BASE_URL=https://your-api.example.com/api` in `frontend/.env.production`, rebuild, redeploy |
+| CORS error calling API | Backend `FRONTEND_URL` missing or wrong | Set `FRONTEND_URL=https://your-spa.example.com` in `backend/.env`, run `php artisan config:clear` |
 | 404 on all routes including `/` | Wrong document root | Point vhost to `dist/` / `build/` folder |
 | Blank page, assets 404 | Wrong `base` path or assets uploaded to wrong folder | Align Vite `base` with URL path; deploy full `dist/` |
 | 500 Internal Server Error | `mod_rewrite` off or bad `.htaccess` syntax | Check Apache error log; confirm `RewriteEngine On` |
@@ -127,10 +221,18 @@ Copy this block into new project README or deployment notes:
 
 ## Linkly reference
 
-This repo ships the file at:
+**`.htaccess`**
 
 - Template (version controlled): `frontend/.htaccess`
 - After build (deploy this): `frontend/dist/.htaccess`
 - Build step: `vite build && cp .htaccess dist/.htaccess` in `frontend/package.json`
 
-Production URL example: `https://linkly.emzinexus.com/login` — requires this file on the server.
+**Production URLs**
+
+- Frontend: `https://linkly.emzinexus.com` — deploy `frontend/dist/`
+- API: `https://linklyapi.emzinexus.com` — deploy Laravel with document root `backend/public`
+
+**Env files**
+
+- Frontend production template: `frontend/.env.production.example` → copy to `frontend/.env.production` before build
+- Backend production vars: see `backend/.env.example` ( `APP_URL`, `FRONTEND_URL`, `APP_BASE_URL` )
