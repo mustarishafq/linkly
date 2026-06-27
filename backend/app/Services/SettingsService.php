@@ -73,10 +73,10 @@ class SettingsService
             ]);
         }
 
-        if (! DB::table('settings')->where('key', 'qr_default')->exists()) {
-            DB::table('settings')->insert([
-                'key' => 'qr_default',
-                'value' => json_encode(self::DEFAULT_QR_DEFAULT),
+        if (! DB::table('organization_qr_defaults')->exists()) {
+            DB::table('organization_qr_defaults')->insert([
+                'id' => 1,
+                ...self::DEFAULT_QR_DEFAULT,
                 'updated_date' => SqlDate::now(),
             ]);
         }
@@ -171,15 +171,22 @@ class SettingsService
 
     public function getQrDefaultConfig(): array
     {
-        $row = DB::table('settings')->where('key', 'qr_default')->first();
+        $row = DB::table('organization_qr_defaults')->where('id', 1)->first();
 
         if (! $row) {
             return self::DEFAULT_QR_DEFAULT;
         }
 
-        $value = is_string($row->value) ? json_decode($row->value, true) : (array) $row->value;
-
-        return $this->normalizeQrDefaultConfig($value);
+        return $this->normalizeQrDefaultConfig([
+            'name' => $row->name,
+            'fg_color' => $row->fg_color,
+            'bg_color' => $row->bg_color,
+            'eye_color' => $row->eye_color,
+            'style' => $row->style,
+            'size' => $row->size,
+            'logo_size' => $row->logo_size,
+            'logo_url' => $row->logo_url,
+        ]);
     }
 
     public function getGeneralConfig(): array
@@ -352,7 +359,29 @@ class SettingsService
             $next['logo_url'] = trim((string) ($patch['logo_url'] ?? ''));
         }
 
-        $this->upsertSetting('qr_default', $next);
+        $exists = DB::table('organization_qr_defaults')->where('id', 1)->exists();
+
+        if ($exists) {
+            DB::table('organization_qr_defaults')
+                ->where('id', 1)
+                ->update([
+                    'name' => $next['name'],
+                    'fg_color' => $next['fg_color'],
+                    'bg_color' => $next['bg_color'],
+                    'eye_color' => $next['eye_color'],
+                    'style' => $next['style'],
+                    'size' => $next['size'],
+                    'logo_size' => $next['logo_size'],
+                    'logo_url' => $next['logo_url'],
+                    'updated_date' => SqlDate::now(),
+                ]);
+        } else {
+            DB::table('organization_qr_defaults')->insert([
+                'id' => 1,
+                ...$next,
+                'updated_date' => SqlDate::now(),
+            ]);
+        }
 
         return $next;
     }

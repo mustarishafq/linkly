@@ -10,6 +10,7 @@ import { RefreshCw } from "lucide-react";
 import { generateSlug, getShortUrl } from "@/lib/qrcode";
 import { toast } from "@/components/ui/use-toast";
 import FormDialog, { FormDialogBody, FormDialogFooter } from "@/components/ui/form-dialog";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 
 export default function LinkFormDialog({ link, campaigns, domains = [], onClose, onSaved }) {
@@ -37,6 +38,7 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
   const [notificationExpanded, setNotificationExpanded] = useState(false);
   const [notificationRules, setNotificationRules] = useState([]);
   const [directoryUsers, setDirectoryUsers] = useState([]);
+  const [createConfirmOpen, setCreateConfirmOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,26 +170,7 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!form.destination_url) return;
-
-    const normalizedSelectedDomain = String(form.custom_domain || "").toLowerCase();
-    const existing = await db.entities.ShortLink.filter({ slug: form.slug }, "-created_date", 50);
-    const duplicate = existing.find((item) => {
-      if (isEditing && item.id === link.id) return false;
-      const existingDomain = String(item.custom_domain || "").toLowerCase();
-      return existingDomain === normalizedSelectedDomain;
-    });
-
-    if (duplicate) {
-      toast({
-        title: "Slug already in use",
-        description: "This slug is already used for the selected domain. Pick another slug or domain.",
-      });
-      return;
-    }
-
+  async function performSave() {
     setSaving(true);
     const data = {
       title: form.title,
@@ -235,6 +218,7 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
           description: "Link was created but QR design could not be saved. Add one from the link detail page.",
         });
         setSaving(false);
+        setCreateConfirmOpen(false);
         onSaved();
         onClose();
         return;
@@ -248,6 +232,7 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
           description: "Link created but notification rules could not be saved. Add them from the link detail page.",
         });
         setSaving(false);
+        setCreateConfirmOpen(false);
         onSaved();
         onClose();
         return;
@@ -256,11 +241,46 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
       toast({ title: "Created", description: "New short link created with QR design" });
     }
     setSaving(false);
+    setCreateConfirmOpen(false);
     onSaved();
     onClose();
   }
 
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.destination_url) return;
+
+    const normalizedSelectedDomain = String(form.custom_domain || "").toLowerCase();
+    const existing = await db.entities.ShortLink.filter({ slug: form.slug }, "-created_date", 50);
+    const duplicate = existing.find((item) => {
+      if (isEditing && item.id === link.id) return false;
+      const existingDomain = String(item.custom_domain || "").toLowerCase();
+      return existingDomain === normalizedSelectedDomain;
+    });
+
+    if (duplicate) {
+      toast({
+        title: "Slug already in use",
+        description: "This slug is already used for the selected domain. Pick another slug or domain.",
+      });
+      return;
+    }
+
+    if (isEditing) {
+      await performSave();
+      return;
+    }
+
+    setCreateConfirmOpen(true);
+  }
+
+  const createConfirmDescription =
+    qrMode === "custom"
+      ? `Create this link with a custom QR design (${customQrForm.name})?`
+      : `Create this link using the organization default QR design (${orgQrDefault.name})?`;
+
   return (
+    <>
     <FormDialog
       onClose={onClose}
       title={isEditing ? "Edit Link" : "Create New Link"}
@@ -421,5 +441,15 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
         </FormDialogFooter>
       </form>
     </FormDialog>
+
+    <ConfirmDialog
+      open={createConfirmOpen}
+      onOpenChange={setCreateConfirmOpen}
+      title="Create link?"
+      description={createConfirmDescription}
+      confirmLabel={saving ? "Creating…" : "Create link"}
+      onConfirm={performSave}
+    />
+    </>
   );
 }

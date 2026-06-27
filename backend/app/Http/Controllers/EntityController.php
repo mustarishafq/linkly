@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\EntityService;
 use App\Services\LinkNotificationService;
+use App\Services\QrDesignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,10 +13,18 @@ class EntityController extends Controller
     public function __construct(
         private EntityService $entities,
         private LinkNotificationService $linkNotifications,
+        private QrDesignService $qrDesigns,
     ) {}
 
     public function list(Request $request, string $entity): JsonResponse
     {
+        if ($entity === 'QRDesign') {
+            $sortBy = $request->input('sortBy', '-created_date');
+            $limit = (int) $request->input('limit', 200);
+
+            return response()->json($this->qrDesigns->filter([], $sortBy, $limit));
+        }
+
         $table = $this->entities->tableFor($entity);
         if (! $table) {
             return response()->json(['message' => 'Unknown entity'], 404);
@@ -31,6 +40,14 @@ class EntityController extends Controller
 
     public function filter(Request $request, string $entity): JsonResponse
     {
+        if ($entity === 'QRDesign') {
+            $where = $request->input('where', []);
+            $sortBy = $request->input('sortBy', '-created_date');
+            $limit = (int) $request->input('limit', 200);
+
+            return response()->json($this->qrDesigns->filter(is_array($where) ? $where : [], $sortBy, $limit));
+        }
+
         $table = $this->entities->tableFor($entity);
         if (! $table) {
             return response()->json(['message' => 'Unknown entity'], 404);
@@ -49,6 +66,10 @@ class EntityController extends Controller
 
     public function show(string $entity, string $id): JsonResponse
     {
+        if ($entity === 'QRDesign') {
+            return response()->json($this->qrDesigns->find((int) $id));
+        }
+
         $table = $this->entities->tableFor($entity);
         if (! $table) {
             return response()->json(['message' => 'Unknown entity'], 404);
@@ -59,6 +80,18 @@ class EntityController extends Controller
 
     public function store(Request $request, string $entity): JsonResponse
     {
+        if ($entity === 'QRDesign') {
+            $user = $request->attributes->get('auth_user');
+
+            try {
+                $record = $this->qrDesigns->create($request->all(), $user?->id);
+            } catch (\InvalidArgumentException $error) {
+                return $this->error('invalid_qr_design', $error->getMessage(), 400);
+            }
+
+            return response()->json($record);
+        }
+
         $table = $this->entities->tableFor($entity);
         if (! $table) {
             return response()->json(['message' => 'Unknown entity'], 404);
@@ -76,6 +109,23 @@ class EntityController extends Controller
 
     public function bulkStore(Request $request, string $entity): JsonResponse
     {
+        if ($entity === 'QRDesign') {
+            $items = $request->input('items', []);
+            if (! is_array($items)) {
+                $items = [];
+            }
+
+            $user = $request->attributes->get('auth_user');
+
+            try {
+                $created = $this->qrDesigns->bulkCreate($items, $user?->id);
+            } catch (\InvalidArgumentException $error) {
+                return $this->error('invalid_qr_design', $error->getMessage(), 400);
+            }
+
+            return response()->json($created);
+        }
+
         $table = $this->entities->tableFor($entity);
         if (! $table) {
             return response()->json(['message' => 'Unknown entity'], 404);
@@ -94,6 +144,18 @@ class EntityController extends Controller
 
     public function update(Request $request, string $entity, string $id): JsonResponse
     {
+        if ($entity === 'QRDesign') {
+            $user = $request->attributes->get('auth_user');
+
+            try {
+                $updated = $this->qrDesigns->update((int) $id, $request->all(), $user?->id);
+            } catch (\InvalidArgumentException $error) {
+                return $this->error('invalid_qr_design', $error->getMessage(), 400);
+            }
+
+            return response()->json($updated);
+        }
+
         $table = $this->entities->tableFor($entity);
         if (! $table) {
             return response()->json(['message' => 'Unknown entity'], 404);
@@ -107,6 +169,13 @@ class EntityController extends Controller
 
     public function destroy(Request $request, string $entity, string $id): JsonResponse
     {
+        if ($entity === 'QRDesign') {
+            $user = $request->attributes->get('auth_user');
+            $deleted = $this->qrDesigns->delete((int) $id, $user?->id);
+
+            return response()->json($deleted);
+        }
+
         $table = $this->entities->tableFor($entity);
         if (! $table) {
             return response()->json(['message' => 'Unknown entity'], 404);

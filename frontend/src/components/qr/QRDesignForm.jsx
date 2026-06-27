@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { getShortUrl } from "@/lib/qrcode";
 import QRCodePreview from "./QRCodePreview";
 import QRDesignFields from "./QRDesignFields";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/use-toast";
 import FormDialog, { FormDialogBody, FormDialogFooter } from "@/components/ui/form-dialog";
 import { Button } from "@/components/ui/button";
@@ -18,12 +19,12 @@ export default function QRDesignForm({ design, linkSlug, linkDomain, onClose, on
     logo_url: design?.logo_url || "",
   });
   const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const previewRef = useRef(null);
 
   const shortUrl = getShortUrl(linkSlug, linkDomain);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function performSave() {
     setSaving(true);
     await onSave({
       ...form,
@@ -31,6 +32,12 @@ export default function QRDesignForm({ design, linkSlug, linkDomain, onClose, on
       logo_size: Number(form.logo_size ?? 20),
     });
     setSaving(false);
+    setConfirmOpen(false);
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setConfirmOpen(true);
   }
 
   function handleDownloadPng() {
@@ -56,47 +63,61 @@ export default function QRDesignForm({ design, linkSlug, linkDomain, onClose, on
   }
 
   return (
-    <FormDialog
-      onClose={onClose}
-      title={design ? "Edit QR Design" : "Create QR Design"}
-      maxWidth="2xl"
-      tall
-    >
-      <FormDialogBody className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <QRDesignFields form={form} setForm={setForm} />
-            <FormDialogFooter className="border-0 px-0 py-0 pt-2">
-              <Button type="button" variant="outline" className="flex-1 h-10" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={saving} className="flex-1 h-10">
-                {saving ? "Saving..." : design ? "Update Design" : "Create Design"}
-              </Button>
-            </FormDialogFooter>
-          </form>
+    <>
+      <FormDialog
+        onClose={onClose}
+        title={design ? "Edit QR Design" : "Create QR Design"}
+        maxWidth="2xl"
+        tall
+      >
+        <FormDialogBody className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <QRDesignFields form={form} setForm={setForm} />
+              <FormDialogFooter className="border-0 px-0 py-0 pt-2">
+                <Button type="button" variant="outline" className="flex-1 h-10" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saving} className="flex-1 h-10">
+                  {saving ? "Saving..." : design ? "Update Design" : "Create Design"}
+                </Button>
+              </FormDialogFooter>
+            </form>
 
-          {/* Preview */}
-          <div className="flex flex-col items-center gap-4 w-full">
-            <p className="text-xs font-medium text-muted-foreground self-start">Live Preview</p>
-            <div className="rounded-xl p-6 border border-border flex items-center justify-center w-full max-w-[320px]" style={{ background: form.bg_color }}>
-              <QRCodePreview
-                value={shortUrl}
-                design={form}
-                size={Number(form.size) || 300}
-                displaySize={192}
-                containerRef={previewRef}
-              />
+            <div className="flex flex-col items-center gap-4 w-full">
+              <p className="text-xs font-medium text-muted-foreground self-start">Live Preview</p>
+              <div className="rounded-xl p-6 border border-border flex items-center justify-center w-full max-w-[320px]" style={{ background: form.bg_color }}>
+                <QRCodePreview
+                  value={shortUrl}
+                  design={form}
+                  size={Number(form.size) || 300}
+                  displaySize={192}
+                  containerRef={previewRef}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadPng}
+                className="w-full max-w-[320px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors"
+              >
+                Download PNG
+              </button>
+              <p className="text-xs text-muted-foreground text-center">Preview updates as you change settings</p>
             </div>
-            <button
-              type="button"
-              onClick={handleDownloadPng}
-              className="w-full max-w-[320px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors"
-            >
-              Download PNG
-            </button>
-            <p className="text-xs text-muted-foreground text-center">Preview updates as you change settings</p>
-          </div>
-      </FormDialogBody>
-    </FormDialog>
+        </FormDialogBody>
+      </FormDialog>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={design ? "Update QR design?" : "Create QR design?"}
+        description={
+          design
+            ? `Save changes to "${form.name}"? This updates the stored design for this link.`
+            : `Create "${form.name}" for this link?`
+        }
+        confirmLabel={saving ? "Saving…" : design ? "Update" : "Create"}
+        onConfirm={performSave}
+      />
+    </>
   );
 }

@@ -3,6 +3,7 @@ import { QrCode, RefreshCw } from "lucide-react";
 import db from "@/api/openClient";
 import { DEFAULT_QR_DESIGN, normalizeQrDesign } from "@/lib/qrDesignConfig";
 import QRDesignFields from "@/components/qr/QRDesignFields";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -13,6 +14,7 @@ export default function QrDefaultSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ ...DEFAULT_QR_DESIGN });
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const loadSettings = async () => {
     setLoading(true);
@@ -43,6 +45,7 @@ export default function QrDefaultSettings() {
         },
       });
       toast.success("Default QR design saved");
+      setConfirmOpen(false);
       await loadSettings();
     } catch (err) {
       setError(err?.message || "Failed to save QR default settings");
@@ -56,36 +59,40 @@ export default function QrDefaultSettings() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 space-y-5 max-w-2xl">
-      <div>
-        <h2 className="text-base font-semibold flex items-center gap-2">
-          <QrCode className="h-4 w-4" />
-          Default QR Design
-        </h2>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Applied automatically when users create new links. Existing links keep their saved design.
-        </p>
+    <>
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-5 max-w-2xl">
+        <div>
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <QrCode className="h-4 w-4" />
+            Default QR Design
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Applied automatically when users create new links. Existing links keep their saved design.
+          </p>
+        </div>
+
+        <QRDesignFields
+          form={form}
+          setForm={setForm}
+          previewUrl={SAMPLE_PREVIEW_URL}
+          previewSize={96}
+        />
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <Button onClick={() => setConfirmOpen(true)} disabled={saving}>
+          Save QR Default
+        </Button>
       </div>
 
-      <QRDesignFields
-        form={form}
-        setForm={setForm}
-        previewUrl={SAMPLE_PREVIEW_URL}
-        previewSize={96}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Save organization QR default?"
+        description="New links will use this design by default. Links that already have a saved QR design will not change."
+        confirmLabel={saving ? "Saving…" : "Save default"}
+        onConfirm={handleSave}
       />
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <Button onClick={handleSave} disabled={saving}>
-        {saving ? (
-          <>
-            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            Saving…
-          </>
-        ) : (
-          "Save QR Default"
-        )}
-      </Button>
-    </div>
+    </>
   );
 }
