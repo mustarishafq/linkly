@@ -534,6 +534,28 @@ Migrations use Laravel’s `$table->id()` (MySQL `BIGINT UNSIGNED AUTO_INCREMENT
 
 Foreign references in JSON payloads (`campaign_id`, etc.) should store **integer IDs** as strings or numbers consistent with the API response.
 
+### Relational tables vs JSON payloads
+
+**Do not store structured domain data as JSON blobs** when the shape is known and relational. Use proper MySQL tables with typed columns and one-to-one or one-to-many relationships.
+
+| Pattern | When to use | Example |
+|---------|-------------|---------|
+| **One-to-one** | Single org-wide or per-parent record | `organization_qr_defaults` (one row, id `1`) |
+| **One-to-many** | Child records owned by a parent | `qr_designs.link_id` → short link |
+| **JSON `payload` in `entity_*`** | Legacy Base44 entities not yet normalized | `entity_shortlink`, `entity_campaign`, … |
+| **`settings` key-value JSON** | Small admin config blobs (SSO secrets, webhook toggles) | `nexus_sso`, `event_webhook` — not for first-class domain models |
+
+**QR code data (required pattern):**
+
+| Table | Relationship | Service |
+|-------|--------------|---------|
+| `organization_qr_defaults` | One org default (singleton row) | `SettingsService::getQrDefaultConfig()` / `updateQrDefaultConfig()` |
+| `qr_designs` | Many designs per link (`link_id` BIGINT, `is_active`, `source`) | `QrDesignService` (API still exposed as `QRDesign` entity) |
+
+Migration: `backend/database/migrations/0001_01_01_000008_create_qr_design_tables.php` — creates tables and migrates legacy `settings.qr_default` JSON + `entity_qrdesign` payloads.
+
+When adding new features, prefer dedicated tables + services over stuffing fields into `settings.value` or `entity_*.payload`.
+
 ---
 
 ## Prerequisites
@@ -701,7 +723,7 @@ Configure under **Settings** (`frontend/src/lib/settingsConfig.js`):
 |-----|---------|
 | **General** | Organization name, default domain, brand color (`BRAND_PRIMARY`), timezone |
 | **Security & SSO** | Nexus SSO secret, issuer, default role — [nexus-sso-setup.md](./nexus-sso-setup.md) |
-| **QR Codes** | Default QR styling for new links |
+| **QR Codes** | Default QR styling for new links (stored in `organization_qr_defaults`, not `settings` JSON). Saves and user choices use confirmation dialogs. |
 | **Notifications** | Outbound event webhooks — [event-webhook-setup.md](./event-webhook-setup.md) |
 
 API: `GET` / `PATCH /api/settings` (admin JWT required). Secrets are redacted on read (`secret_set`, `api_key_set`).
@@ -731,7 +753,7 @@ Core product behavior beyond auth and entity CRUD. Verify these after backend + 
 | **A/B testing** | `ABVariant` entities + AB Testing page |
 | **Smart redirects** | `RedirectRule` entities (geo, device, time rules) |
 | **Analytics** | Click logs, charts, referrer/device breakdowns |
-| **QR codes** | `QRDesign` entities + per-link QR styling |
+| **QR codes** | Org default in `organization_qr_defaults`; per-link designs in `qr_designs` (one-to-many). User decisions require confirmation — see [DESIGN_TEMPLATE.md §11.3](./DESIGN_TEMPLATE.md#113-alertdialog-and-user-decisions-confirm-required) |
 
 ### Custom domains
 
@@ -820,7 +842,7 @@ Entities are registered in `backend/config/linkly.php` and mirrored in `frontend
 | Campaign | `entity_campaign` |
 | ClickLog | `entity_clicklog` |
 | CustomDomain | `entity_customdomain` |
-| QRDesign | `entity_qrdesign` |
+| QRDesign | `qr_designs` (relational; API entity name `QRDesign`) |
 | LinkNotificationRule | `entity_linknotificationrule` (+ dedicated migration) |
 | RedirectRule | `entity_redirectrule` |
 | ShortLink | `entity_shortlink` |

@@ -854,9 +854,34 @@ Reorder dialog: `sm:max-w-lg p-0 gap-0 max-h-[85vh]`
 
 Crop dialog: `sm:max-w-md`; crop area `h-64 rounded-lg bg-muted`
 
-### 11.3 AlertDialog (destructive confirm)
+### 11.3 AlertDialog and user decisions (confirm required)
 
-Standard shadcn AlertDialog. Applications delete requires typing exact app name.
+**Rule:** Every meaningful user **decision** must show a confirmation dialog before the action is applied or persisted. Do not save or switch state silently when the user is choosing between options or committing a change.
+
+Use the shared `ConfirmDialog` wrapper (`frontend/src/components/ui/confirm-dialog.jsx`) built on shadcn `AlertDialog`. Follow mobile compact dialog rules in §11.9 (`w-[calc(100vw-1.5rem)]`, horizontal footer).
+
+| Decision type | Confirm before | Example copy |
+|---------------|----------------|--------------|
+| **Mode / option switch** | Applying the new choice | “Use custom QR design?” / “Use organization default?” |
+| **Create with options** | Submitting the form | “Create link?” + summary of QR choice |
+| **Save settings** | PATCH to API | “Save organization QR default?” |
+| **Create / update record** | Persisting | “Create QR design?” / “Update QR design?” |
+| **Set active** | Changing which record is active | “Set active QR design?” |
+| **Delete** | Irreversible removal | “Delete QR design?” — use `destructive` styling |
+
+**QR code flows (reference implementation):**
+
+| Component | Confirmed actions |
+|-----------|-------------------|
+| `LinkQrStyleSection` | Switch organization default ↔ custom |
+| `LinkFormDialog` | Create link (includes QR choice summary) |
+| `QrDefaultSettings` | Save org default |
+| `QRDesignForm` | Create / update design |
+| `QRDesignManager` | Set active, delete |
+
+Destructive confirms (delete app, delete design) use `destructive` on the confirm button. Applications delete may require typing the exact name (stricter pattern).
+
+**Do not** rely on toast-only feedback as a substitute for confirmation on decisions the user explicitly makes.
 
 ### 11.4 Sheet
 
@@ -1883,15 +1908,12 @@ Filters in collapsible card (mobile collapsed by default):
 - [ ] Mobile compact dialogs: `w-[calc(100vw-1.5rem)]`, not full-width (§11.9)
 - [ ] Two-button dialog footers: horizontal `flex-row` on mobile, not stacked (§11.9)
 - [ ] Glass pickers use `glassDialogPanelStyles` + `glassDialogMutedText` (§7.0, §11.9)
-- [ ] Destructive actions use AlertDialog
-
-### States
+- [ ] Every user decision shows `ConfirmDialog` before apply/save (§11.3)
+- [ ] Destructive actions use AlertDialog with `destructive` confirm
 - [ ] Loading: semantic spinner (§17.1)
 - [ ] Empty: dashed border or centered icon pattern (§17.2)
 - [ ] Errors: token-based banners or inline messages
-- [ ] Destructive actions use AlertDialog
-
-### Motion & feedback
+- [ ] User decisions confirmed before persist (§11.3); destructive actions use AlertDialog
 - [ ] Header entrance animation
 - [ ] Toasts via Sonner
 - [ ] Hover transitions ≤ 300ms
@@ -1927,6 +1949,9 @@ Filters in collapsible card (mobile collapsed by default):
 | Glass styles | `frontend/src/components/layout/glassStyles.js` |
 | Theme | `frontend/src/components/theme/ThemeProvider.jsx`, `ThemeToggle.jsx` |
 | Toaster | `frontend/src/components/ui/sonner.jsx` |
+| Confirm dialog | `frontend/src/components/ui/confirm-dialog.jsx` |
+| QR default settings | `frontend/src/components/qr/QrDefaultSettings.jsx` |
+| Link QR picker | `frontend/src/components/links/LinkQrStyleSection.jsx` |
 | Auth pages | `frontend/src/pages/Login.jsx`, `Register.jsx`, `ForgotPassword.jsx` |
 | Settings | `frontend/src/pages/Settings.jsx` |
 | Dashboard | `frontend/src/pages/Dashboard.jsx` |

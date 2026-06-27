@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/AuthContext";
 
 import { RefreshCw } from "lucide-react";
 import { generateSlug, getShortUrl } from "@/lib/qrcode";
+import { isReservedShortLinkSlug } from "@/lib/reservedPaths";
 import { toast } from "@/components/ui/use-toast";
 import FormDialog, { FormDialogBody, FormDialogFooter } from "@/components/ui/form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
@@ -262,6 +263,14 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
       toast({
         title: "Slug already in use",
         description: "This slug is already used for the selected domain. Pick another slug or domain.",
+      });
+      return;
+    }
+
+    if (isReservedShortLinkSlug(form.slug)) {
+      toast({
+        title: "Reserved slug",
+        description: "This slug conflicts with an app route. Choose a different slug.",
       });
       return;
     }

@@ -345,9 +345,8 @@ export default function Domains() {
             ))}
           </div>
           <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
-            Short links on custom domains use the{" "}
-            <span className="font-mono text-foreground/80">/r/slug</span> path — e.g.{" "}
-            <span className="font-mono text-foreground/80">https://go.yourbrand.com/r/promo</span>
+            Short links on custom domains use the root path — e.g.{" "}
+            <span className="font-mono text-foreground/80">https://go.yourbrand.com/promo</span>
           </p>
         </DashboardWidget>
       </motion.div>
@@ -638,7 +637,7 @@ function DomainCard({
               <div className="min-w-0">
                 <p className="font-semibold text-sm font-mono truncate">{domain.domain}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  https://{domain.domain}/r/your-slug
+                  https://{domain.domain}/your-slug
                 </p>
               </div>
             </div>

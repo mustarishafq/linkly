@@ -1,4 +1,5 @@
 import db from "@/api/openClient";
+import { isReservedShortLinkSlug } from "@/lib/reservedPaths";
 
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -23,6 +24,11 @@ export default function RedirectPage() {
 
   useEffect(() => {
     async function handleRedirect() {
+      if (isReservedShortLinkSlug(slug)) {
+        setStatus("not_found");
+        return;
+      }
+
       // Find the link by slug and match custom domain when duplicates exist.
       const links = await db.entities.ShortLink.filter({ slug });
       const requestHost = normalizeHost(window.location.host);

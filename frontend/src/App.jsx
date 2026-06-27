@@ -40,11 +40,11 @@ const AuthenticatedApp = () => {
   if (!isAuthenticated) {
     return (
       <Routes>
-        <Route path="/r/:slug" element={<RedirectPage />} />
         <Route path="/sso/nexus" element={<SsoNexus />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/:slug" element={<RedirectPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -69,7 +69,6 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
-      <Route path="/r/:slug" element={<RedirectPage />} />
       <Route path="/sso/nexus" element={<SsoNexus />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
@@ -87,6 +86,7 @@ const AuthenticatedApp = () => {
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
+      <Route path="/:slug" element={<RedirectPage />} />
     </Routes>
   );
 };

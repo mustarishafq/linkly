@@ -41,5 +41,5 @@ export function generateSlug(length = 6) {
 
 export function getShortUrl(slug, customDomain) {
   const base = normalizeDomainBase(customDomain) || window.location.origin;
-  return `${base}/r/${slug}`;
+  return `${base}/${slug}`;
 }
