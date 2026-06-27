@@ -7,6 +7,7 @@ import { ArrowLeft, MousePointerClick, Users, Target, Link2 } from "lucide-react
 import StatCard from "@/components/ui/StatCard";
 import ClicksChart from "@/components/dashboard/ClicksChart";
 import DeviceChart from "@/components/dashboard/DeviceChart";
+import { filterOfficialClicks } from "@/lib/linkPreview";
 
 export default function CampaignDetail() {
   const { id } = useParams();
@@ -47,9 +48,10 @@ export default function CampaignDetail() {
     );
   }
 
-  const uniqueVisitors = clicks.filter((c) => c.is_unique).length;
-  const conversions = clicks.filter((c) => c.is_converted).length;
-  const convRate = clicks.length > 0 ? ((conversions / clicks.length) * 100).toFixed(1) : 0;
+  const officialClicks = filterOfficialClicks(clicks);
+  const uniqueVisitors = officialClicks.filter((c) => c.is_unique).length;
+  const conversions = officialClicks.filter((c) => c.is_converted).length;
+  const convRate = officialClicks.length > 0 ? ((conversions / officialClicks.length) * 100).toFixed(1) : 0;
 
   return (
     <div className="space-y-6">
@@ -65,16 +67,16 @@ export default function CampaignDetail() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Link2} label="Links" value={links.length} />
-        <StatCard icon={MousePointerClick} label="Total Clicks" value={clicks.length} />
+        <StatCard icon={MousePointerClick} label="Total Clicks" value={officialClicks.length} />
         <StatCard icon={Users} label="Unique Visitors" value={uniqueVisitors} />
         <StatCard icon={Target} label="Conv. Rate" value={`${convRate}%`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <ClicksChart clicks={clicks} />
+          <ClicksChart clicks={officialClicks} />
         </div>
-        <DeviceChart clicks={clicks} />
+        <DeviceChart clicks={officialClicks} />
       </div>
 
       <div className="bg-card rounded-xl border border-border p-5">

@@ -20,6 +20,8 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { filterOfficialClicks, isTestClick } from "@/lib/linkPreview";
+import PreviewClickBadge from "@/components/clicks/PreviewClickBadge";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/layout/PageHeader";
 import StatCard from "@/components/ui/StatCard";
@@ -91,6 +93,7 @@ export default function ClickHistory() {
   const [conversionFilter, setConversionFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [hidePreviewClicks, setHidePreviewClicks] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -113,16 +116,19 @@ export default function ClickHistory() {
     return map;
   }, [links]);
 
+  const officialClicks = useMemo(() => filterOfficialClicks(clicks), [clicks]);
+  const previewClickCount = clicks.length - officialClicks.length;
+
   const stats = useMemo(() => {
     const todayStart = startOfDay(new Date());
-    const todayClicks = clicks.filter(
+    const todayClicks = officialClicks.filter(
       (c) => new Date(c.created_date) >= todayStart
     ).length;
-    const conversions = clicks.filter((c) => c.is_converted).length;
-    const uniqueVisitors = clicks.filter((c) => c.is_unique).length;
+    const conversions = officialClicks.filter((c) => c.is_converted).length;
+    const uniqueVisitors = officialClicks.filter((c) => c.is_unique).length;
 
-    return { total: clicks.length, todayClicks, conversions, uniqueVisitors };
-  }, [clicks]);
+    return { total: officialClicks.length, todayClicks, conversions, uniqueVisitors };
+  }, [officialClicks]);
 
   const allDevices = useMemo(
     () => [...new Set(clicks.map((c) => c.device_type).filter(Boolean))],
@@ -130,11 +136,12 @@ export default function ClickHistory() {
   );
 
   const hasActiveFilters = Boolean(
-    search || deviceFilter || conversionFilter || dateFrom || dateTo
+    search || deviceFilter || conversionFilter || dateFrom || dateTo || hidePreviewClicks
   );
 
   const filtered = useMemo(() => {
     return clicks.filter((c) => {
+      if (hidePreviewClicks && isTestClick(c)) return false;
       if (deviceFilter && c.device_type !== deviceFilter) return false;
       if (conversionFilter === "converted" && !c.is_converted) return false;
       if (conversionFilter === "pending" && c.is_converted) return false;
@@ -154,7 +161,7 @@ export default function ClickHistory() {
         c.ip_address?.includes(s)
       );
     });
-  }, [clicks, search, deviceFilter, conversionFilter, dateFrom, dateTo, linkMap]);
+  }, [clicks, search, deviceFilter, conversionFilter, dateFrom, dateTo, hidePreviewClicks, linkMap]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -167,6 +174,7 @@ export default function ClickHistory() {
     setConversionFilter("");
     setDateFrom("");
     setDateTo("");
+    setHidePreviewClicks(false);
     setPage(0);
   }
 
@@ -189,6 +197,7 @@ export default function ClickHistory() {
       "Device",
       "Referrer",
       "Converted",
+      "Preview",
     ];
     const rows = filtered.map((c) => [
       format(new Date(c.created_date), "yyyy-MM-dd HH:mm:ss"),
@@ -200,6 +209,7 @@ export default function ClickHistory() {
       c.device_type || "",
       c.referrer_source || "",
       c.is_converted ? "Yes" : "No",
+      isTestClick(c) ? "Yes" : "No",
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -221,7 +231,11 @@ export default function ClickHistory() {
       <PageHeader
         icon={History}
         title="Click History"
-        description="Browse and export every click across your links"
+        description={
+          previewClickCount > 0
+            ? `Browse and export every click across your links · ${previewClickCount} preview`
+            : "Browse and export every click across your links"
+        }
         action={
           <Button
             variant="outline"
@@ -239,7 +253,7 @@ export default function ClickHistory() {
           icon={MousePointerClick}
           label="Total Clicks"
           value={stats.total.toLocaleString()}
-          subtitle={`${filtered.length.toLocaleString()} shown`}
+          subtitle={`${filtered.length.toLocaleString()} shown${previewClickCount > 0 ? ` · ${previewClickCount} preview` : ""}`}
           accent="primary"
           index={0}
         />
@@ -358,6 +372,19 @@ export default function ClickHistory() {
             aria-label="To date"
           />
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none pt-1">
+          <input
+            type="checkbox"
+            checked={hidePreviewClicks}
+            onChange={(e) => {
+              setHidePreviewClicks(e.target.checked);
+              setPage(0);
+            }}
+            className="rounded border-input"
+          />
+          Hide preview clicks
+        </label>
         </CollapsibleFilters>
       </motion.div>
 
@@ -407,6 +434,7 @@ export default function ClickHistory() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      {isTestClick(click) && <PreviewClickBadge />}
                       <Badge variant="secondary" className="font-normal">
                         {click.referrer_source || "Direct"}
                       </Badge>
@@ -433,7 +461,7 @@ export default function ClickHistory() {
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Converted
                         </Badge>
-                      ) : (
+                      ) : isTestClick(click) ? null : (
                         <Button
                           variant="outline"
                           size="sm"
@@ -515,21 +543,26 @@ export default function ClickHistory() {
                           {click.ip_address || "—"}
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          {click.is_converted ? (
-                            <Badge className="bg-success/10 text-success border-success/20 hover:bg-success/10">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Converted
-                            </Badge>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => markConverted(click.id)}
-                            >
-                              Mark
-                            </Button>
-                          )}
+                          <div className="flex items-center justify-end gap-2">
+                            {isTestClick(click) && !click.is_converted && (
+                              <PreviewClickBadge />
+                            )}
+                            {click.is_converted ? (
+                              <Badge className="bg-success/10 text-success border-success/20 hover:bg-success/10">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Converted
+                              </Badge>
+                            ) : isTestClick(click) ? null : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => markConverted(click.id)}
+                              >
+                                Mark
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

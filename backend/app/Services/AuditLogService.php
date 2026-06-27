@@ -35,7 +35,7 @@ class AuditLogService
         'QRDesign' => ['name', 'link_id', 'is_active', 'foreground_color', 'background_color'],
         'RedirectRule' => ['name', 'link_id', 'is_active', 'rule_type', 'target_url'],
         'ABVariant' => ['name', 'variant_name', 'link_id', 'weight', 'destination_url'],
-        'ClickLog' => ['slug', 'link_id', 'country', 'browser', 'device_type', 'is_converted', 'is_unique'],
+        'ClickLog' => ['slug', 'link_id', 'country', 'browser', 'device_type', 'is_converted', 'is_unique', 'is_test'],
         'LinkNotificationRule' => ['label', 'link_id', 'metric', 'trigger_mode', 'trigger_value', 'subscriber_user_ids'],
     ];
 

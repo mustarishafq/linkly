@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import FormDialog, { FormDialogBody, FormDialogFooter } from "@/components/ui/form-dialog";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 const STATUS_FILTERS = [
   { id: "all", label: "All" },
@@ -68,6 +69,7 @@ export default function Campaigns() {
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { requestConfirm, dialog: confirmDialog } = useConfirmDialog();
 
   useEffect(() => {
     loadData();
@@ -87,6 +89,20 @@ export default function Campaigns() {
     await db.entities.Campaign.delete(id);
     setCampaigns((prev) => prev.filter((c) => c.id !== id));
     toast({ title: "Campaign deleted" });
+  }
+
+  function promptDeleteCampaign(campaign, linkCount) {
+    const linksNote =
+      linkCount > 0
+        ? ` ${linkCount} link${linkCount === 1 ? "" : "s"} will be unassigned from this campaign.`
+        : "";
+    requestConfirm({
+      title: "Delete campaign?",
+      description: `"${campaign.name}" will be deleted permanently.${linksNote}`,
+      confirmLabel: "Delete",
+      destructive: true,
+      onConfirm: () => deleteCampaign(campaign.id),
+    });
   }
 
   function openCreateForm() {
@@ -229,7 +245,7 @@ export default function Campaigns() {
                   maxClicks={maxClicks}
                   index={i}
                   onEdit={() => { setEditing(campaign); setShowForm(true); }}
-                  onDelete={() => deleteCampaign(campaign.id)}
+                  onDelete={() => promptDeleteCampaign(campaign, campaignLinks.length)}
                 />
               ))}
             </div>
@@ -244,6 +260,8 @@ export default function Campaigns() {
           onSaved={loadData}
         />
       )}
+
+      {confirmDialog}
     </div>
   );
 }

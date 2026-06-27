@@ -68,6 +68,8 @@ class LinkNotificationService
             ))
             : [];
 
+        $clicks = array_values(array_filter($clicks, fn (array $row) => ! (bool) ($row['is_test'] ?? false)));
+
         $totalClicks = count($clicks);
         $uniqueClicks = count(array_filter($clicks, fn (array $row) => (bool) ($row['is_unique'] ?? false)));
         $conversions = count(array_filter($clicks, fn (array $row) => (bool) ($row['is_converted'] ?? false)));

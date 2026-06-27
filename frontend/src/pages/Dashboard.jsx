@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { subDays, startOfDay, isBefore } from "date-fns";
+import { filterOfficialClicks } from "@/lib/linkPreview";
 import StatCard from "@/components/ui/StatCard";
 import ClicksChart from "@/components/dashboard/ClicksChart";
 import DeviceChart from "@/components/dashboard/DeviceChart";
@@ -96,21 +97,23 @@ export default function Dashboard() {
   const prevWeekEnd = weekStart;
   const yesterdayStart = startOfDay(subDays(now, 1));
 
-  const totalClicks = clicks.length;
-  const uniqueVisitors = clicks.filter((c) => c.is_unique).length;
+  const officialClicks = filterOfficialClicks(clicks);
 
-  const thisWeekClicks = countInRange(clicks, weekStart, weekEnd);
-  const lastWeekClicks = countInRange(clicks, prevWeekStart, prevWeekEnd);
+  const totalClicks = officialClicks.length;
+  const uniqueVisitors = officialClicks.filter((c) => c.is_unique).length;
+
+  const thisWeekClicks = countInRange(officialClicks, weekStart, weekEnd);
+  const lastWeekClicks = countInRange(officialClicks, prevWeekStart, prevWeekEnd);
   const clicksTrend = getPeriodChange(thisWeekClicks, lastWeekClicks);
 
-  const thisWeekUnique = countInRange(clicks, weekStart, weekEnd, true);
-  const lastWeekUnique = countInRange(clicks, prevWeekStart, prevWeekEnd, true);
+  const thisWeekUnique = countInRange(officialClicks, weekStart, weekEnd, true);
+  const lastWeekUnique = countInRange(officialClicks, prevWeekStart, prevWeekEnd, true);
   const uniqueTrend = getPeriodChange(thisWeekUnique, lastWeekUnique);
 
-  const todayClicks = clicks.filter(
+  const todayClicks = officialClicks.filter(
     (c) => new Date(c.created_date).toDateString() === now.toDateString()
   );
-  const yesterdayClicks = clicks.filter((c) => {
+  const yesterdayClicks = officialClicks.filter((c) => {
     const d = new Date(c.created_date);
     return d >= yesterdayStart && d < todayStart;
   });
@@ -215,7 +218,7 @@ export default function Dashboard() {
           thisWeekUnique={thisWeekUnique}
           clicksTrend={clicksTrend}
           uniqueTrend={uniqueTrend}
-          clicks={clicks}
+          clicks={officialClicks}
         />
       </motion.div>
 
@@ -226,9 +229,9 @@ export default function Dashboard() {
         className="grid grid-cols-1 lg:grid-cols-3 gap-6"
       >
         <div className="lg:col-span-2">
-          <ClicksChart clicks={clicks} />
+          <ClicksChart clicks={officialClicks} />
         </div>
-        <DeviceChart clicks={clicks} />
+        <DeviceChart clicks={officialClicks} />
       </motion.div>
 
       <motion.div
@@ -238,9 +241,9 @@ export default function Dashboard() {
         className="grid grid-cols-1 lg:grid-cols-3 gap-6"
       >
         <div className="lg:col-span-2">
-          <TopLinksTable links={links} clicks={clicks} />
+          <TopLinksTable links={links} clicks={officialClicks} />
         </div>
-        <RecentActivity clicks={clicks} links={links} />
+        <RecentActivity clicks={officialClicks} links={links} />
       </motion.div>
     </div>
   );

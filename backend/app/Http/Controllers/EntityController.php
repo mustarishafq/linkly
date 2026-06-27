@@ -100,7 +100,7 @@ class EntityController extends Controller
         $user = $request->attributes->get('auth_user');
         $record = $this->entities->create($table, $entity, $request->all(), $user?->id);
 
-        if ($entity === 'ClickLog' && ! empty($record['link_id'])) {
+        if ($entity === 'ClickLog' && ! empty($record['link_id']) && empty($record['is_test'])) {
             $this->linkNotifications->evaluateForLink((int) $record['link_id']);
         }
 

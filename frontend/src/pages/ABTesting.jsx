@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { generateSlug, getShortUrl } from "@/lib/qrcode";
 import PageHeader from "@/components/layout/PageHeader";
+import { filterOfficialClicks } from "@/lib/linkPreview";
 import DashboardWidget from "@/components/dashboard/DashboardWidget";
 import StatCard from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/button";
@@ -81,7 +82,7 @@ export default function ABTesting() {
     ]);
     setLinks(l.filter((link) => link.is_ab_test));
     setVariants(v);
-    setClicks(c);
+    setClicks(filterOfficialClicks(c));
     setLoading(false);
   }
 

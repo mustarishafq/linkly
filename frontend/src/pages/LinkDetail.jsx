@@ -8,12 +8,12 @@ import {
   Copy,
   QrCode,
   ExternalLink,
+  PlayCircle,
   MousePointerClick,
   Users,
   Target,
   Share2,
   Link2,
-  Globe,
   Tag,
   Megaphone,
   Percent,
@@ -21,8 +21,10 @@ import {
   Check,
   ArrowUpRight,
   Globe2,
+  ChevronDown,
 } from "lucide-react";
 import { getShortUrl } from "@/lib/qrcode";
+import { getTestLinkUrl, filterOfficialClicks } from "@/lib/linkPreview";
 import { toast } from "@/components/ui/use-toast";
 import { format, subDays, startOfDay, isBefore } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -34,9 +36,17 @@ import SourceBreakdown from "@/components/dashboard/SourceBreakdown";
 import LinkRecentActivity from "@/components/dashboard/LinkRecentActivity";
 import QRDesignManager from "@/components/qr/QRDesignManager";
 import LinkFormDialog from "@/components/links/LinkFormDialog";
+import LinkFavicon from "@/components/links/LinkFavicon";
 import LinkNotificationManager from "@/components/links/LinkNotificationManager";
 import QRDialog from "@/components/links/QRDialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/AuthContext";
 import { glassPanelStyles } from "@/components/layout/glassStyles";
@@ -108,32 +118,6 @@ function StatusBadge({ status }) {
   );
 }
 
-function LinkFavicon({ url }) {
-  const domain = url
-    ? (() => { try { return new URL(url).hostname; } catch { return ""; } })()
-    : "";
-  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : null;
-
-  if (faviconUrl) {
-    return (
-      <div className="w-11 h-11 rounded-xl border border-border bg-muted/50 flex items-center justify-center overflow-hidden ring-1 ring-black/5 dark:ring-white/5 shrink-0">
-        <img
-          src={faviconUrl}
-          alt=""
-          className="w-5 h-5"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-11 h-11 rounded-xl border border-border bg-muted/50 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5 shrink-0">
-      <Globe className="w-4 h-4 text-muted-foreground" />
-    </div>
-  );
-}
-
 export default function LinkDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -201,9 +185,11 @@ export default function LinkDetail() {
   }
 
   const shortUrl = getShortUrl(link.slug, link.custom_domain);
-  const uniqueClicks = clicks.filter((c) => c.is_unique).length;
-  const conversions = clicks.filter((c) => c.is_converted).length;
-  const conversionRate = clicks.length > 0 ? ((conversions / clicks.length) * 100).toFixed(1) : 0;
+  const testLinkUrl = getTestLinkUrl(link.slug, link.custom_domain);
+  const officialClicks = filterOfficialClicks(clicks);
+  const uniqueClicks = officialClicks.filter((c) => c.is_unique).length;
+  const conversions = officialClicks.filter((c) => c.is_converted).length;
+  const conversionRate = officialClicks.length > 0 ? ((conversions / officialClicks.length) * 100).toFixed(1) : 0;
 
   const now = new Date();
   const weekStart = startOfDay(subDays(now, 6));
@@ -211,26 +197,26 @@ export default function LinkDetail() {
   const prevWeekStart = startOfDay(subDays(now, 13));
   const prevWeekEnd = weekStart;
 
-  const thisWeekClicks = countInRange(clicks, weekStart, weekEnd);
-  const lastWeekClicks = countInRange(clicks, prevWeekStart, prevWeekEnd);
+  const thisWeekClicks = countInRange(officialClicks, weekStart, weekEnd);
+  const lastWeekClicks = countInRange(officialClicks, prevWeekStart, prevWeekEnd);
   const clicksTrend = getPeriodChange(thisWeekClicks, lastWeekClicks);
 
-  const thisWeekUnique = countInRange(clicks, weekStart, weekEnd, true);
-  const lastWeekUnique = countInRange(clicks, prevWeekStart, prevWeekEnd, true);
+  const thisWeekUnique = countInRange(officialClicks, weekStart, weekEnd, true);
+  const lastWeekUnique = countInRange(officialClicks, prevWeekStart, prevWeekEnd, true);
   const uniqueTrend = getPeriodChange(thisWeekUnique, lastWeekUnique);
 
-  const todayClicks = clicks.filter(
+  const todayClicks = officialClicks.filter(
     (c) => new Date(c.created_date).toDateString() === now.toDateString()
   );
 
-  const referrerItems = countByField(clicks, "referrer_source", "Direct");
-  const countryItems = countByField(clicks, "country", "Unknown");
+  const referrerItems = countByField(officialClicks, "referrer_source", "Direct");
+  const countryItems = countByField(officialClicks, "country", "Unknown");
 
   const stats = [
     {
       icon: MousePointerClick,
       label: "Total Clicks",
-      value: clicks.length.toLocaleString(),
+      value: officialClicks.length.toLocaleString(),
       subtitle: `${todayClicks.length} today`,
       accent: "primary",
       ...clicksTrend,
@@ -254,7 +240,7 @@ export default function LinkDetail() {
       icon: Percent,
       label: "Conversion Rate",
       value: `${conversionRate}%`,
-      subtitle: clicks.length > 0 ? `${conversions} of ${clicks.length}` : "No clicks yet",
+      subtitle: officialClicks.length > 0 ? `${conversions} of ${officialClicks.length}` : "No clicks yet",
       accent: "warning",
     },
   ];
@@ -271,7 +257,7 @@ export default function LinkDetail() {
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-3">
-            <LinkFavicon url={link.destination_url} />
+            <LinkFavicon url={link.destination_url} size="md" />
             <div className="min-w-0 flex-1">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">
                 {link.title || `/${link.slug}`}
@@ -349,14 +335,22 @@ export default function LinkDetail() {
               )}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={handleCopy}>
+          <div className="grid grid-cols-5 gap-1.5 w-full sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:w-auto shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full px-0 sm:w-auto sm:px-3"
+              onClick={handleCopy}
+              aria-label={copied ? "Copied" : "Copy link"}
+            >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copied" : "Copy"}
+              <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
+              className="w-full px-0 sm:w-auto sm:px-3"
+              aria-label="Share link"
               onClick={() => {
                 if (navigator.share) {
                   navigator.share({ url: shortUrl, title: link.title || link.slug });
@@ -367,27 +361,76 @@ export default function LinkDetail() {
               }}
             >
               <Share2 className="h-3.5 w-3.5" />
-              Share
+              <span className="hidden sm:inline">Share</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowQr(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full px-0 sm:w-auto sm:px-3"
+              onClick={() => setShowQr(true)}
+              aria-label="Show QR code"
+            >
               <QrCode className="h-3.5 w-3.5" />
-              QR
+              <span className="hidden sm:inline">QR</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full px-0 sm:w-auto sm:px-3"
+              onClick={() => setShowEdit(true)}
+              aria-label="Edit link"
+            >
               <Edit className="h-3.5 w-3.5" />
-              Edit
+              <span className="hidden sm:inline">Edit</span>
             </Button>
-            <Button variant="default" size="sm" asChild>
-              <a href={link.destination_url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Visit
-              </a>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="default" size="sm" className="w-full px-0 sm:w-auto sm:px-3" aria-label="Visit options">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Visit</span>
+                  <ChevronDown className="h-3 w-3 opacity-70 sm:h-3.5 sm:w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem asChild className="items-start py-2">
+                  <a href={testLinkUrl} target="_blank" rel="noopener noreferrer">
+                    <PlayCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex flex-col items-start gap-0.5">
+                      <span>Test short link</span>
+                      <span className="text-[11px] font-normal text-muted-foreground">
+                        Full redirect path, not tracked
+                      </span>
+                    </span>
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="items-start py-2">
+                  <a href={link.destination_url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex flex-col items-start gap-0.5">
+                      <span>Open destination</span>
+                      <span className="text-[11px] font-normal text-muted-foreground">
+                        Final URL only, not tracked
+                      </span>
+                    </span>
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleCopy} className="items-start py-2">
+                  <Copy className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex flex-col items-start gap-0.5">
+                    <span>Copy short link</span>
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      For sharing — clicks are tracked
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </motion.div>
 
-      {clicks.length === 0 && (
+      {officialClicks.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -417,7 +460,7 @@ export default function LinkDetail() {
         ))}
       </div>
 
-      {clicks.length > 0 && (
+      {officialClicks.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -428,7 +471,7 @@ export default function LinkDetail() {
             thisWeekUnique={thisWeekUnique}
             clicksTrend={clicksTrend}
             uniqueTrend={uniqueTrend}
-            clicks={clicks}
+            clicks={officialClicks}
           />
         </motion.div>
       )}
@@ -440,9 +483,9 @@ export default function LinkDetail() {
         className="grid grid-cols-1 lg:grid-cols-3 gap-6"
       >
         <div className="lg:col-span-2">
-          <ClicksChart clicks={clicks} />
+          <ClicksChart clicks={officialClicks} />
         </div>
-        <DeviceChart clicks={clicks} />
+        <DeviceChart clicks={officialClicks} />
       </motion.div>
 
       <motion.div

@@ -10,6 +10,8 @@ import { RefreshCw } from "lucide-react";
 import { generateSlug, getShortUrl } from "@/lib/qrcode";
 import { isReservedShortLinkSlug } from "@/lib/reservedPaths";
 import { toast } from "@/components/ui/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import { getTestLinkUrl } from "@/lib/linkPreview";
 import FormDialog, { FormDialogBody, FormDialogFooter } from "@/components/ui/form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -239,7 +241,18 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
         return;
       }
 
-      toast({ title: "Created", description: "New short link created with QR design" });
+      toast({
+        title: "Created",
+        description: "New short link created with QR design",
+        action: (
+          <ToastAction
+            altText="Test link"
+            onClick={() => window.open(getTestLinkUrl(created.slug, created.custom_domain), "_blank", "noopener,noreferrer")}
+          >
+            Test link
+          </ToastAction>
+        ),
+      });
     }
     setSaving(false);
     setCreateConfirmOpen(false);

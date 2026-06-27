@@ -9,6 +9,7 @@ import {
   Search,
   Copy,
   ExternalLink,
+  PlayCircle,
   MoreHorizontal,
   Trash2,
   Edit,
@@ -16,7 +17,6 @@ import {
   Link2,
   MousePointerClick,
   TrendingUp,
-  Globe,
   Tag,
   ChevronRight,
   Filter,
@@ -32,8 +32,11 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { getShortUrl } from "@/lib/qrcode";
+import { getTestLinkUrl } from "@/lib/linkPreview";
 import { useAuth } from "@/lib/AuthContext";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import LinkFormDialog from "@/components/links/LinkFormDialog";
+import LinkFavicon from "@/components/links/LinkFavicon";
 import QRDialog from "@/components/links/QRDialog";
 import PageHeader from "@/components/layout/PageHeader";
 import DashboardWidget from "@/components/dashboard/DashboardWidget";
@@ -109,6 +112,7 @@ export default function Links() {
   });
   const location = useLocation();
   const { user } = useAuth();
+  const { requestConfirm, dialog: confirmDialog } = useConfirmDialog();
 
   function setView(mode) {
     setViewMode(mode);
@@ -170,6 +174,17 @@ export default function Links() {
     await db.entities.ShortLink.delete(id);
     setLinks((prev) => prev.filter((l) => l.id !== id));
     toast({ title: "Deleted", description: "Link has been removed" });
+  }
+
+  function promptDeleteLink(link) {
+    const label = link.title || `/${link.slug}`;
+    requestConfirm({
+      title: "Delete link?",
+      description: `"${label}" will be removed permanently along with its click history and QR designs.`,
+      confirmLabel: "Delete",
+      destructive: true,
+      onConfirm: () => deleteLink(link.id),
+    });
   }
 
   function getCampaignName(id) {
@@ -327,7 +342,7 @@ export default function Links() {
                   onCopy={copyLink}
                   onQr={() => setQrLink(link)}
                   onEdit={() => { setEditingLink(link); setShowForm(true); }}
-                  onDelete={() => deleteLink(link.id)}
+                  onDelete={() => promptDeleteLink(link)}
                 />
               ))}
             </div>
@@ -343,7 +358,7 @@ export default function Links() {
                   onCopy={copyLink}
                   onQr={() => setQrLink(link)}
                   onEdit={() => { setEditingLink(link); setShowForm(true); }}
-                  onDelete={() => deleteLink(link.id)}
+                  onDelete={() => promptDeleteLink(link)}
                 />
               ))}
             </div>
@@ -364,6 +379,8 @@ export default function Links() {
       {qrLink && (
         <QRDialog link={qrLink} onClose={() => setQrLink(null)} />
       )}
+
+      {confirmDialog}
     </div>
   );
 }
@@ -404,6 +421,8 @@ function ViewToggle({ viewMode, onChange }) {
 }
 
 function LinkActionsMenu({ link, onCopy, onQr, onEdit, onDelete, triggerClassName }) {
+  const testLinkUrl = getTestLinkUrl(link.slug, link.custom_domain);
+
   return (
     <>
       <button
@@ -413,6 +432,19 @@ function LinkActionsMenu({ link, onCopy, onQr, onEdit, onDelete, triggerClassNam
         aria-label="Copy link"
       >
         <Copy className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          window.open(testLinkUrl, "_blank", "noopener,noreferrer");
+        }}
+        className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+        aria-label="Test link"
+        title="Test link (not counted in analytics)"
+      >
+        <PlayCircle className="h-3.5 w-3.5" />
       </button>
       <button
         type="button"
@@ -436,7 +468,12 @@ function LinkActionsMenu({ link, onCopy, onQr, onEdit, onDelete, triggerClassNam
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem asChild>
+            <a href={testLinkUrl} target="_blank" rel="noopener noreferrer">
+              <PlayCircle className="h-3.5 w-3.5 mr-2" /> Test link
+            </a>
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={onEdit}>
             <Edit className="h-3.5 w-3.5 mr-2" /> Edit
           </DropdownMenuItem>
@@ -447,7 +484,7 @@ function LinkActionsMenu({ link, onCopy, onQr, onEdit, onDelete, triggerClassNam
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <a href={link.destination_url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-3.5 w-3.5 mr-2" /> Visit URL
+              <ExternalLink className="h-3.5 w-3.5 mr-2" /> Open destination
             </a>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -460,32 +497,6 @@ function LinkActionsMenu({ link, onCopy, onQr, onEdit, onDelete, triggerClassNam
         </DropdownMenuContent>
       </DropdownMenu>
     </>
-  );
-}
-
-function LinkFavicon({ link }) {
-  const domain = link.destination_url
-    ? (() => { try { return new URL(link.destination_url).hostname; } catch { return ""; } })()
-    : "";
-  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : null;
-
-  if (faviconUrl) {
-    return (
-      <div className="w-10 h-10 rounded-xl border border-border bg-muted/50 flex items-center justify-center overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
-        <img
-          src={faviconUrl}
-          alt=""
-          className="w-5 h-5"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-10 h-10 rounded-xl border border-border bg-muted/50 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/5">
-      <Globe className="w-4 h-4 text-muted-foreground" />
-    </div>
   );
 }
 
@@ -578,7 +589,7 @@ function LinkCard({ link, index, maxClicks, campaignName, onCopy, onQr, onEdit, 
       <div className="group h-full bg-card rounded-2xl border border-border hover:border-primary/30 hover:shadow-md transition-all duration-200 flex flex-col">
         <div className="p-4 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <LinkFavicon link={link} />
+            <LinkFavicon url={link.destination_url} />
             <div
               className="hidden sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
@@ -645,65 +656,53 @@ function LinkRow({ link, index, maxClicks, campaignName, onCopy, onQr, onEdit, o
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.03, 0.3) }}
     >
-      <Link
-        to={`/links/${link.id}`}
-        className="group flex items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 hover:bg-secondary/30 transition-colors"
-      >
-        <div className="shrink-0 mt-0.5 sm:mt-0">
-          <LinkFavicon link={link} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start sm:items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-sm group-hover:text-primary transition-colors truncate">
-                  {link.title || `/${link.slug}`}
-                </span>
-                <StatusBadge status={link.status} />
-                {link.is_ab_test && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-chart-5/10 text-chart-5 uppercase tracking-wider ring-1 ring-chart-5/20">
-                    A/B Test
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-xs text-primary font-mono truncate">{shortUrl}</span>
-                <button
-                  type="button"
-                  onClick={(e) => onCopy(link, e)}
-                  className="p-1 rounded-md hover:bg-secondary transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 shrink-0"
-                  aria-label="Copy short URL"
-                >
-                  <Copy className="h-3 w-3 text-muted-foreground" />
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5 truncate">{link.destination_url}</p>
-            </div>
-          </div>
-
-          <div className="mt-2.5 flex items-center gap-3">
-            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary/60 transition-all duration-500"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="text-sm font-semibold tabular-nums shrink-0 text-muted-foreground">
-              {clicks.toLocaleString()}
-            </span>
-          </div>
-
-          <div className="mt-2.5">
-            <LinkMeta link={link} campaignName={campaignName} />
-          </div>
-        </div>
-
-        <div
-          className="hidden sm:flex items-center gap-0.5 shrink-0 self-center"
-          onClick={(e) => e.preventDefault()}
-          onKeyDown={(e) => e.stopPropagation()}
+      <div className="group flex items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 hover:bg-secondary/30 transition-colors">
+        <Link
+          to={`/links/${link.id}`}
+          className="flex min-w-0 flex-1 items-start sm:items-center gap-3 sm:gap-4"
         >
+          <div className="shrink-0 mt-0.5 sm:mt-0">
+            <LinkFavicon url={link.destination_url} />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start sm:items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm group-hover:text-primary transition-colors truncate">
+                    {link.title || `/${link.slug}`}
+                  </span>
+                  <StatusBadge status={link.status} />
+                  {link.is_ab_test && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-chart-5/10 text-chart-5 uppercase tracking-wider ring-1 ring-chart-5/20">
+                      A/B Test
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-primary font-mono truncate mt-1">{shortUrl}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{link.destination_url}</p>
+              </div>
+            </div>
+
+            <div className="mt-2.5 flex items-center gap-3">
+              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary/60 transition-all duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="text-sm font-semibold tabular-nums shrink-0 text-muted-foreground">
+                {clicks.toLocaleString()}
+              </span>
+            </div>
+
+            <div className="mt-2.5">
+              <LinkMeta link={link} campaignName={campaignName} />
+            </div>
+          </div>
+        </Link>
+
+        <div className="hidden sm:flex items-center gap-0.5 shrink-0 self-center">
           <LinkActionsMenu
             link={link}
             onCopy={onCopy}
@@ -713,7 +712,17 @@ function LinkRow({ link, index, maxClicks, campaignName, onCopy, onQr, onEdit, o
           />
           <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
-      </Link>
+
+        <div className="flex sm:hidden items-center gap-0.5 shrink-0 self-center">
+          <LinkActionsMenu
+            link={link}
+            onCopy={onCopy}
+            onQr={onQr}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
+      </div>
     </motion.div>
   );
 }

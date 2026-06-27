@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import PageHeader from "@/components/layout/PageHeader";
 import DashboardWidget from "@/components/dashboard/DashboardWidget";
 import StatCard from "@/components/ui/StatCard";
@@ -101,6 +102,7 @@ export default function SmartRedirects() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { requestConfirm, dialog: confirmDialog } = useConfirmDialog();
 
   useEffect(() => {
     loadData();
@@ -120,6 +122,17 @@ export default function SmartRedirects() {
     await db.entities.RedirectRule.delete(id);
     setRules((prev) => prev.filter((r) => r.id !== id));
     toast({ title: "Rule deleted" });
+  }
+
+  function promptDeleteRule(rule, link) {
+    const linkLabel = link?.title || (link?.slug ? `/${link.slug}` : "this link");
+    requestConfirm({
+      title: "Delete redirect rule?",
+      description: `The ${rule.rule_type} rule for ${linkLabel} will be removed permanently.`,
+      confirmLabel: "Delete",
+      destructive: true,
+      onConfirm: () => deleteRule(rule.id),
+    });
   }
 
   async function toggleRule(rule) {
@@ -291,7 +304,7 @@ export default function SmartRedirects() {
                   link={linkMap[rule.link_id]}
                   index={i}
                   onToggle={() => toggleRule(rule)}
-                  onDelete={() => deleteRule(rule.id)}
+                  onDelete={() => promptDeleteRule(rule, linkMap[rule.link_id])}
                 />
               ))}
             </div>
@@ -302,6 +315,8 @@ export default function SmartRedirects() {
       {showForm && (
         <RedirectRuleForm links={links} onClose={() => setShowForm(false)} onSaved={loadData} />
       )}
+
+      {confirmDialog}
     </div>
   );
 }

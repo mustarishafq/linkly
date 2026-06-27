@@ -17,6 +17,7 @@ import ReferrerChart from "@/components/analytics/ReferrerChart";
 import CountryList from "@/components/analytics/CountryList";
 import HourlyChart from "@/components/analytics/HourlyChart";
 import AnalyticsFilters, { EMPTY_FILTERS } from "@/components/analytics/AnalyticsFilters";
+import { filterOfficialClicks } from "@/lib/linkPreview";
 import PageHeader from "@/components/layout/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -98,10 +99,11 @@ export default function Analytics() {
   }
 
   const allTags = [...new Set(links.flatMap((l) => l.tags || []))];
-  const allCountries = [...new Set(clicks.map((c) => c.country).filter(Boolean))];
-  const allDevices = [...new Set(clicks.map((c) => c.device_type).filter(Boolean))];
+  const officialClicks = filterOfficialClicks(clicks);
+  const allCountries = [...new Set(officialClicks.map((c) => c.country).filter(Boolean))];
+  const allDevices = [...new Set(officialClicks.map((c) => c.device_type).filter(Boolean))];
 
-  const filteredClicks = clicks.filter((c) => {
+  const filteredClicks = officialClicks.filter((c) => {
     if (filters.campaign) {
       const campaignLinks = links
         .filter((l) => l.campaign_id === filters.campaign)
@@ -158,7 +160,7 @@ export default function Analytics() {
       label: "Total Clicks",
       value: filteredClicks.length.toLocaleString(),
       subtitle: hasActiveFilters
-        ? `${filteredClicks.length} of ${clicks.length} total`
+        ? `${filteredClicks.length} of ${officialClicks.length} official`
         : `${thisWeekClicks} this week`,
       accent: "primary",
       ...clicksTrend,

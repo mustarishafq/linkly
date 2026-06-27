@@ -1,6 +1,8 @@
 import { format, formatDistanceToNow } from "date-fns";
 import { Activity, Globe, Smartphone, Monitor } from "lucide-react";
 import DashboardWidget from "./DashboardWidget";
+import PreviewClickBadge from "@/components/clicks/PreviewClickBadge";
+import { isTestClick } from "@/lib/linkPreview";
 
 const deviceIcons = {
   Desktop: Monitor,
@@ -40,9 +42,10 @@ export default function LinkRecentActivity({ clicks }) {
                     <DeviceIcon className="h-3.5 w-3.5 text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">
-                    <p className="text-xs font-medium truncate">
-                      {click.referrer_source || "Direct"}
-                    </p>
+                    <div className="text-xs font-medium truncate flex items-center gap-1.5">
+                      <span className="truncate">{click.referrer_source || "Direct"}</span>
+                      {isTestClick(click) && <PreviewClickBadge className="text-[9px] px-1 py-0" />}
+                    </div>
                     <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                       {click.country || "Unknown"} · {click.browser || "Unknown"}
                       {click.is_unique && " · Unique"}

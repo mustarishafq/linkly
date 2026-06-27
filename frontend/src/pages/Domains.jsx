@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/layout/PageHeader";
 import { APP_NAME } from "@/lib/settingsConfig";
@@ -129,6 +130,7 @@ export default function Domains() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { user } = useAuth();
+  const { requestConfirm, dialog: confirmDialog } = useConfirmDialog();
 
   useEffect(() => {
     loadDomains();
@@ -229,6 +231,20 @@ export default function Domains() {
     await db.entities.CustomDomain.delete(id);
     await loadDomains();
     toast({ title: "Domain removed" });
+  }
+
+  function promptRemoveDomain(domain, linkCount) {
+    const linksNote =
+      linkCount > 0
+        ? ` ${linkCount} link${linkCount === 1 ? "" : "s"} using this domain will keep working but lose the custom domain assignment.`
+        : "";
+    requestConfirm({
+      title: "Delete domain?",
+      description: `"${domain.domain}" will be removed permanently.${linksNote}`,
+      confirmLabel: "Delete",
+      destructive: true,
+      onConfirm: () => removeDomain(domain.id),
+    });
   }
 
   const linkCountByDomain = useMemo(() => {
@@ -459,7 +475,10 @@ export default function Domains() {
                   index={i}
                   onVerify={() => verifyDomain(domain)}
                   onToggleActive={() => toggleActive(domain)}
-                  onDelete={() => removeDomain(domain.id)}
+                  onDelete={() => promptRemoveDomain(
+                    domain,
+                    linkCountByDomain[String(domain.domain || "").toLowerCase()] || 0
+                  )}
                   onCopy={copyText}
                 />
               ))}
@@ -467,6 +486,8 @@ export default function Domains() {
           )}
         </DashboardWidget>
       </motion.div>
+
+      {confirmDialog}
     </div>
   );
 }
