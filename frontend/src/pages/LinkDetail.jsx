@@ -149,20 +149,20 @@ export default function LinkDetail() {
 
   useEffect(() => {
     async function load() {
-      const [linkData, clickData, domainData, campaignData] = await Promise.all([
-        db.entities.ShortLink.list(),
-        db.entities.ClickLog.filter({ link_id: id }, "-created_date", 500),
+      const linkId = Number(id);
+      const [found, clickData, domainData, campaignData] = await Promise.all([
+        db.entities.ShortLink.get(id),
+        db.entities.ClickLog.filter({ link_id: linkId }, "-created_date", 500),
         db.entities.CustomDomain.list(),
         db.entities.Campaign.list(),
       ]);
-      const found = linkData.find((l) => l.id === id);
       setLink(found);
       setClicks(clickData);
       setDomains(domainData);
       setCampaigns(campaignData);
 
       if (found?.campaign_id) {
-        setCampaign(campaignData.find((c) => c.id === found.campaign_id) || null);
+        setCampaign(campaignData.find((c) => String(c.id) === String(found.campaign_id)) || null);
       }
 
       setLoading(false);
@@ -171,8 +171,8 @@ export default function LinkDetail() {
   }, [id]);
 
   async function reloadLink() {
-    const linkData = await db.entities.ShortLink.list();
-    setLink(linkData.find((l) => l.id === id));
+    const found = await db.entities.ShortLink.get(id);
+    setLink(found);
   }
 
   function handleCopy() {

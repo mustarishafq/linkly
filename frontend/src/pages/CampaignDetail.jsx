@@ -22,7 +22,7 @@ export default function CampaignDetail() {
         db.entities.ShortLink.filter({ campaign_id: id }),
         db.entities.ClickLog.filter({ campaign_id: id }, "-created_date", 500),
       ]);
-      setCampaign(allCampaigns.find((c) => c.id === id));
+      setCampaign(allCampaigns.find((c) => String(c.id) === String(id)));
       setLinks(allLinks);
       setClicks(allClicks);
       setLoading(false);
