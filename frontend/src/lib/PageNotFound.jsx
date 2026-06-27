@@ -1,10 +1,12 @@
-import { useLocation, Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import db from "@/api/openClient";
 import { Button } from "@/components/ui/button";
+import { useGoBack } from "@/hooks/useGoBack";
 
 export default function PageNotFound() {
   const location = useLocation();
+  const goBack = useGoBack("/");
   const pageName = location.pathname.substring(1);
 
   const { data: authData, isFetched } = useQuery({
@@ -36,8 +38,8 @@ export default function PageNotFound() {
         </div>
       )}
 
-      <Button asChild className="mt-2">
-        <Link to="/">Back to dashboard</Link>
+      <Button className="mt-2" onClick={goBack}>
+        Back to dashboard
       </Button>
     </div>
   );

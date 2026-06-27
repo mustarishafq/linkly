@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft,
   Copy,
   QrCode,
   ExternalLink,
@@ -22,12 +21,16 @@ import {
   ArrowUpRight,
   Globe2,
   ChevronDown,
+  FlaskConical,
+  Trophy,
 } from "lucide-react";
 import { getShortUrl } from "@/lib/qrcode";
 import { getTestLinkUrl, filterOfficialClicks } from "@/lib/linkPreview";
 import { toast } from "@/components/ui/use-toast";
 import { format, subDays, startOfDay, isBefore } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useGoBack } from "@/hooks/useGoBack";
+import BackButton from "@/components/ui/BackButton";
 import StatCard from "@/components/ui/StatCard";
 import ClicksChart from "@/components/dashboard/ClicksChart";
 import DeviceChart from "@/components/dashboard/DeviceChart";
@@ -50,6 +53,159 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/AuthContext";
 import { glassPanelStyles } from "@/components/layout/glassStyles";
+
+const VARIANT_COLORS = [
+  { bar: "bg-primary", badge: "bg-primary/10 text-primary ring-1 ring-primary/20", dot: "bg-primary" },
+  { bar: "bg-info", badge: "bg-info/10 text-info ring-1 ring-info/20", dot: "bg-info" },
+  { bar: "bg-warning", badge: "bg-warning/10 text-warning ring-1 ring-warning/20", dot: "bg-warning" },
+  { bar: "bg-success", badge: "bg-success/10 text-success ring-1 ring-success/20", dot: "bg-success" },
+];
+
+function getBestVariant(variants, clicks) {
+  if (!variants.length) return null;
+  return variants.reduce((best, variant) => {
+    const variantClicks = clicks.filter((c) => c.ab_variant === variant.name).length;
+    const variantConversions = clicks.filter(
+      (c) => c.ab_variant === variant.name && c.is_converted
+    ).length;
+    const convRate = variantClicks > 0 ? variantConversions / variantClicks : 0;
+    const bestClicks = clicks.filter((c) => c.ab_variant === best?.name).length;
+    const bestConversions = clicks.filter(
+      (c) => c.ab_variant === best?.name && c.is_converted
+    ).length;
+    const bestConvRate = bestClicks > 0 ? bestConversions / bestClicks : 0;
+    return convRate > bestConvRate ? variant : best;
+  }, variants[0]);
+}
+
+function ABVariantBreakdown({ variants, clicks }) {
+  const totalClicks = clicks.length;
+  const bestVariant = getBestVariant(variants, clicks);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn("rounded-2xl border p-4 sm:p-5", glassPanelStyles)}
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <FlaskConical className="h-4 w-4 text-chart-5" />
+        <h2 className="text-sm font-semibold">A/B Test Variants</h2>
+        <span className="text-xs text-muted-foreground">
+          {variants.length} destinations
+        </span>
+      </div>
+
+      {totalClicks > 0 && (
+        <div className="mb-4">
+          <div className="flex h-2 rounded-full overflow-hidden bg-muted ring-1 ring-border/60">
+            {variants.map((variant, idx) => {
+              const variantClicks = clicks.filter((c) => c.ab_variant === variant.name).length;
+              const pct = (variantClicks / totalClicks) * 100;
+              const color = VARIANT_COLORS[idx % VARIANT_COLORS.length];
+              if (pct <= 0) return null;
+              return (
+                <div
+                  key={variant.id}
+                  className={cn("h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full", color.bar)}
+                  style={{ width: `${pct}%` }}
+                  title={`${variant.name}: ${pct.toFixed(0)}%`}
+                />
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+            {variants.map((variant, idx) => {
+              const color = VARIANT_COLORS[idx % VARIANT_COLORS.length];
+              return (
+                <span key={variant.id} className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <span className={cn("w-2 h-2 rounded-full shrink-0", color.dot)} />
+                  {variant.name}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {variants.map((variant, idx) => {
+          const variantClicks = clicks.filter((c) => c.ab_variant === variant.name).length;
+          const variantConversions = clicks.filter(
+            (c) => c.ab_variant === variant.name && c.is_converted
+          ).length;
+          const variantConvRate =
+            variantClicks > 0 ? ((variantConversions / variantClicks) * 100).toFixed(1) : "0.0";
+          const sharePercent =
+            totalClicks > 0 ? ((variantClicks / totalClicks) * 100).toFixed(0) : 0;
+          const color = VARIANT_COLORS[idx % VARIANT_COLORS.length];
+          const isLeader = variant.id === bestVariant?.id && variantClicks > 0;
+
+          return (
+            <div
+              key={variant.id}
+              className={cn(
+                "rounded-xl border p-3 transition-colors",
+                isLeader
+                  ? "border-primary/30 bg-primary/[0.04] ring-1 ring-primary/10"
+                  : "border-border/80 bg-secondary/20"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0", color.badge)}>
+                    {variant.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">{variant.weight}% traffic</span>
+                  {isLeader && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-warning bg-warning/10 px-2 py-0.5 rounded-md ring-1 ring-warning/20">
+                      <Trophy className="h-2.5 w-2.5" /> Leader
+                    </span>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p
+                    className={cn(
+                      "text-sm font-bold tabular-nums",
+                      parseFloat(variantConvRate) > 0 ? "text-primary" : "text-muted-foreground"
+                    )}
+                  >
+                    {variantConvRate}%
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">CVR</p>
+                </div>
+              </div>
+
+              <a
+                href={variant.destination_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors truncate mb-2 group/url"
+              >
+                <ExternalLink className="h-3 w-3 shrink-0 opacity-60 group-hover/url:opacity-100 transition-opacity" />
+                <span className="truncate">{variant.destination_url}</span>
+              </a>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-1.5 rounded-full bg-background overflow-hidden ring-1 ring-border/60">
+                  <div
+                    className={cn("h-full rounded-full transition-all duration-500", color.bar)}
+                    style={{
+                      width: totalClicks > 0 ? `${(variantClicks / totalClicks) * 100}%` : "0%",
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] font-medium tabular-nums text-muted-foreground shrink-0">
+                  {sharePercent}% · {variantClicks}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
 
 function getPeriodChange(current, previous) {
   if (previous === 0) return current > 0 ? { change: 100, changeType: "up" } : null;
@@ -121,7 +277,9 @@ function StatusBadge({ status }) {
 export default function LinkDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const goBack = useGoBack("/links");
   const [link, setLink] = useState(null);
+  const [variants, setVariants] = useState([]);
   const [clicks, setClicks] = useState([]);
   const [campaign, setCampaign] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
@@ -142,6 +300,13 @@ export default function LinkDetail() {
       ]);
       setLink(found);
       setClicks(clickData);
+
+      if (found?.is_ab_test) {
+        const variantData = await db.entities.ABVariant.filter({ link_id: linkId });
+        setVariants(variantData);
+      } else {
+        setVariants([]);
+      }
       setDomains(domainData);
       setCampaigns(campaignData);
 
@@ -177,8 +342,8 @@ export default function LinkDetail() {
         <Link2 className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
         <p className="text-lg font-medium">Link not found</p>
         <p className="text-sm text-muted-foreground mt-1">This link may have been deleted.</p>
-        <Button variant="link" asChild className="mt-4">
-          <Link to="/links">← Back to links</Link>
+        <Button variant="link" className="mt-4" onClick={goBack}>
+          ← Back to links
         </Button>
       </div>
     );
@@ -248,28 +413,38 @@ export default function LinkDetail() {
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-3">
-        <Link
-          to="/links"
-          className="p-2 rounded-lg hover:bg-secondary transition-colors shrink-0 mt-0.5"
-          aria-label="Back to links"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
+        <BackButton
+          fallback="/links"
+          className="mt-0.5"
+          label="Back to links"
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-3">
-            <LinkFavicon url={link.destination_url} size="md" />
+            {link.is_ab_test ? (
+              <div className="w-11 h-11 rounded-xl bg-chart-5/10 flex items-center justify-center shrink-0 ring-1 ring-chart-5/20">
+                <FlaskConical className="h-4 w-4 text-chart-5" />
+              </div>
+            ) : (
+              <LinkFavicon url={link.destination_url} size="md" />
+            )}
             <div className="min-w-0 flex-1">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">
                 {link.title || `/${link.slug}`}
               </h1>
-              <a
-                href={link.destination_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-primary transition-colors truncate block mt-0.5"
-              >
-                {link.destination_url}
-              </a>
+              {link.is_ab_test && variants.length > 0 ? (
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {variants.length} destinations · traffic split across variants
+                </p>
+              ) : (
+                <a
+                  href={link.destination_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors truncate block mt-0.5"
+                >
+                  {link.destination_url}
+                </a>
+              )}
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <StatusBadge status={link.status || "active"} />
                 {link.is_ab_test && (
@@ -403,17 +578,33 @@ export default function LinkDetail() {
                     </span>
                   </a>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild className="items-start py-2">
-                  <a href={link.destination_url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                    <span className="flex flex-col items-start gap-0.5">
-                      <span>Open destination</span>
-                      <span className="text-[11px] font-normal text-muted-foreground">
-                        Final URL only, not tracked
+                {link.is_ab_test && variants.length > 0 ? (
+                  variants.map((variant) => (
+                    <DropdownMenuItem key={variant.id} asChild className="items-start py-2">
+                      <a href={variant.destination_url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        <span className="flex flex-col items-start gap-0.5 min-w-0">
+                          <span>Open {variant.name}</span>
+                          <span className="text-[11px] font-normal text-muted-foreground truncate max-w-full">
+                            {variant.destination_url}
+                          </span>
+                        </span>
+                      </a>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <DropdownMenuItem asChild className="items-start py-2">
+                    <a href={link.destination_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      <span className="flex flex-col items-start gap-0.5">
+                        <span>Open destination</span>
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          Final URL only, not tracked
+                        </span>
                       </span>
-                    </span>
-                  </a>
-                </DropdownMenuItem>
+                    </a>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleCopy} className="items-start py-2">
                   <Copy className="h-3.5 w-3.5 shrink-0" />
@@ -429,6 +620,10 @@ export default function LinkDetail() {
           </div>
         </div>
       </motion.div>
+
+      {link.is_ab_test && variants.length > 0 && (
+        <ABVariantBreakdown variants={variants} clicks={officialClicks} />
+      )}
 
       {officialClicks.length === 0 && (
         <motion.div

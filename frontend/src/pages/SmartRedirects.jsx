@@ -10,14 +10,22 @@ import {
   Globe,
   Smartphone,
   Clock,
-  ArrowRight,
+  ChevronRight,
   Link2,
   ShieldCheck,
   ExternalLink,
   Search,
   Filter,
   Zap,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
@@ -248,7 +256,7 @@ export default function SmartRedirects() {
           }
           noPadding
         >
-          <div className="px-5 pb-4 space-y-3 border-b border-border">
+          <div className="px-4 sm:px-5 pb-4 space-y-3 border-b border-border">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
@@ -260,8 +268,33 @@ export default function SmartRedirects() {
               />
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-2 min-w-0">
+            <div className="sm:hidden space-y-3">
+              <FilterGroup label="Type" showIcon>
+                {TYPE_FILTERS.map((filter) => (
+                  <FilterPill
+                    key={filter.id}
+                    active={typeFilter === filter.id}
+                    onClick={() => setTypeFilter(filter.id)}
+                  >
+                    {filter.label}
+                  </FilterPill>
+                ))}
+              </FilterGroup>
+              <FilterGroup label="Status">
+                {STATUS_FILTERS.map((filter) => (
+                  <FilterPill
+                    key={filter.id}
+                    active={statusFilter === filter.id}
+                    onClick={() => setStatusFilter(filter.id)}
+                  >
+                    {filter.label}
+                  </FilterPill>
+                ))}
+              </FilterGroup>
+            </div>
+
+            <div className="hidden sm:flex sm:items-center sm:gap-4">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
                   {TYPE_FILTERS.map((filter) => (
@@ -275,13 +308,12 @@ export default function SmartRedirects() {
                   ))}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none sm:ml-auto">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {STATUS_FILTERS.map((filter) => (
                   <FilterPill
                     key={filter.id}
                     active={statusFilter === filter.id}
                     onClick={() => setStatusFilter(filter.id)}
-                    compact
                   >
                     {filter.label}
                   </FilterPill>
@@ -296,9 +328,9 @@ export default function SmartRedirects() {
               onCreate={() => setShowForm(true)}
             />
           ) : (
-            <div className="p-4 sm:p-5 space-y-3">
+            <div className="divide-y divide-border">
               {filtered.map((rule, i) => (
-                <RuleCard
+                <RuleRow
                   key={rule.id}
                   rule={rule}
                   link={linkMap[rule.link_id]}
@@ -321,14 +353,37 @@ export default function SmartRedirects() {
   );
 }
 
-function FilterPill({ active, onClick, children, compact }) {
+function FilterGroup({ label, showIcon, children }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        {showIcon ? (
+          <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        ) : (
+          <span className="w-3.5 shrink-0" aria-hidden />
+        )}
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      </div>
+      <div className="relative -mx-4 px-4">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none touch-pan-x snap-x snap-mandatory">
+          {children}
+        </div>
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-card to-transparent"
+          aria-hidden
+        />
+      </div>
+    </div>
+  );
+}
+
+function FilterPill({ active, onClick, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "shrink-0 rounded-full text-xs font-medium border transition-all duration-200",
-        compact ? "px-2.5 py-1" : "px-3 py-1.5",
+        "shrink-0 snap-start rounded-full px-3 py-1.5 text-xs font-medium border transition-all duration-200",
         active
           ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
           : "bg-secondary/60 border-border/60 text-muted-foreground hover:border-primary/40 hover:text-foreground"
@@ -362,138 +417,210 @@ function EmptyState({ hasFilters, onCreate }) {
   );
 }
 
-function RuleCard({ rule, link, index, onToggle, onDelete }) {
+function RuleRow({ rule, link, index, onToggle, onDelete }) {
   const meta = RULE_META[rule.rule_type] || RULE_META.country;
   const Icon = meta.icon;
+  const displayUrl = rule.redirect_url.replace(/^https?:\/\//, "");
+  const slug = link?.slug || "unknown";
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.03, duration: 0.25 }}
-      className={cn(
-        "group relative rounded-2xl border bg-card overflow-hidden transition-all duration-300",
-        rule.is_active
-          ? "border-border hover:border-primary/25 hover:shadow-lg hover:shadow-primary/5"
-          : "border-border/60 opacity-60 hover:opacity-80"
-      )}
+      transition={{ delay: Math.min(index * 0.03, 0.3) }}
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/[0.02] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-
-      <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 p-4 sm:p-5">
-        {/* Type icon + badge */}
-        <div className="flex items-start gap-3 sm:items-center shrink-0">
-          <div
-            className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ring-1 ring-black/[0.04] dark:ring-white/10",
-              meta.iconBg
-            )}
-          >
-            <Icon className={cn("h-5 w-5", meta.iconColor)} />
-          </div>
-          <div className="sm:hidden flex-1 min-w-0">
-            <RuleBadges rule={rule} meta={meta} />
-          </div>
+      <div
+        className={cn(
+          "group flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 transition-colors",
+          rule.is_active ? "hover:bg-secondary/30" : "opacity-60 hover:opacity-80 hover:bg-secondary/20"
+        )}
+      >
+        <div
+          className={cn(
+            "w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ring-1 ring-black/[0.04] dark:ring-white/10",
+            meta.iconBg
+          )}
+        >
+          <Icon className={cn("h-4 w-4", meta.iconColor)} />
         </div>
 
-        {/* Main content — redirect flow */}
-        <div className="flex-1 min-w-0 space-y-2.5">
-          <div className="hidden sm:block">
-            <RuleBadges rule={rule} meta={meta} />
+        <div className="flex-1 min-w-0 flex flex-col gap-2 sm:block">
+          <div className="flex items-center gap-2 min-w-0 sm:hidden">
+            <span className="text-sm font-semibold font-mono text-primary truncate">/{slug}</span>
+            {link?.title && (
+              <span className="text-xs text-muted-foreground truncate">{link.title}</span>
+            )}
+            <RuleTypeBadge meta={meta} />
+            <RuleStatusBadge active={rule.is_active} />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            {/* Source link */}
-            <div className="flex items-center gap-2 min-w-0 shrink-0">
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/60 border border-border/60">
-                <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span className="text-sm font-mono font-medium text-primary truncate">
-                  /{link?.slug || "unknown"}
-                </span>
-              </div>
-            </div>
+          <RuleFlowPipeline
+            slug={slug}
+            linkTitle={link?.title}
+            conditionValue={rule.condition_value}
+            displayUrl={displayUrl}
+            redirectUrl={rule.redirect_url}
+            Icon={Icon}
+            meta={meta}
+          />
+        </div>
 
-            <ArrowRight className="h-4 w-4 text-muted-foreground/50 shrink-0 hidden sm:block" />
-
-            {/* Condition */}
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs text-muted-foreground shrink-0 sm:hidden">when</span>
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50 min-w-0">
-                <Icon className={cn("h-3.5 w-3.5 shrink-0", meta.iconColor)} />
-                <span className="text-sm font-semibold truncate">{rule.condition_value}</span>
-              </div>
-            </div>
-
-            <ArrowRight className="h-4 w-4 text-muted-foreground/50 shrink-0 hidden sm:block" />
-
-            {/* Destination */}
-            <a
-              href={rule.redirect_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 bg-background hover:border-primary/30 hover:bg-primary/[0.02] transition-colors min-w-0 group/url"
-            >
-              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover/url:text-primary transition-colors" />
-              <span className="text-sm text-muted-foreground group-hover/url:text-foreground truncate transition-colors">
-                {rule.redirect_url.replace(/^https?:\/\//, "")}
-              </span>
-            </a>
-          </div>
-
-          {link?.title && (
-            <p className="text-xs text-muted-foreground truncate">{link.title}</p>
+        <div className="hidden sm:flex items-center gap-2 shrink-0">
+          <RuleTypeBadge meta={meta} />
+          {rule.priority > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded-full ring-1 ring-border/60">
+              <Zap className="h-2.5 w-2.5" />
+              P{rule.priority}
+            </span>
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 sm:flex-col sm:items-end sm:gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="hidden sm:flex items-center gap-2">
             <Switch
               checked={rule.is_active}
               onCheckedChange={onToggle}
               aria-label={rule.is_active ? "Disable rule" : "Enable rule"}
             />
-            <span
-              className={cn(
-                "text-xs font-medium",
-                rule.is_active ? "text-success" : "text-muted-foreground"
-              )}
-            >
-              {rule.is_active ? "Active" : "Off"}
-            </span>
+            <RuleStatusBadge active={rule.is_active} />
           </div>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="p-2 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 sm:opacity-100"
-            aria-label="Delete rule"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          <RuleActionsMenu rule={rule} onToggle={onToggle} onDelete={onDelete} />
         </div>
       </div>
     </motion.div>
   );
 }
 
-function RuleBadges({ rule, meta }) {
+function RuleTypeBadge({ meta }) {
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
-          meta.badge
-        )}
-      >
-        {meta.label}
-      </span>
-      {rule.priority > 0 && (
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
-          <Zap className="h-2.5 w-2.5" />
-          Priority {rule.priority}
-        </span>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0",
+        meta.badge
       )}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+function RuleStatusBadge({ active, className }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ring-1 shrink-0",
+        active
+          ? "bg-success/10 text-success ring-success/20"
+          : "bg-muted text-muted-foreground ring-border",
+        className
+      )}
+    >
+      <span className={cn("w-1.5 h-1.5 rounded-full", active ? "bg-success" : "bg-muted-foreground")} />
+      {active ? "Active" : "Off"}
+    </span>
+  );
+}
+
+function RuleFlowPipeline({ slug, linkTitle, conditionValue, displayUrl, redirectUrl, Icon, meta }) {
+  return (
+    <>
+      <div className="hidden sm:inline-flex items-center h-9 w-fit max-w-full rounded-lg border border-border/60 bg-secondary/25 overflow-hidden min-w-0">
+        <FlowSegment label="Link" icon={Link2} iconClassName="text-primary">
+          <span className="font-mono text-sm font-medium text-primary truncate">/{slug}</span>
+          {linkTitle && (
+            <span className="text-xs text-muted-foreground truncate hidden md:inline">
+              · {linkTitle}
+            </span>
+          )}
+        </FlowSegment>
+        <FlowDivider />
+        <FlowSegment label="If" icon={Icon} iconClassName={meta.iconColor}>
+          <span className="text-sm font-semibold truncate">{conditionValue}</span>
+        </FlowSegment>
+        <FlowDivider />
+        <FlowSegment label="Then" icon={ExternalLink} iconClassName="text-muted-foreground" isLast>
+          <a
+            href={redirectUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:text-primary truncate transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {displayUrl}
+          </a>
+        </FlowSegment>
+      </div>
+
+      <div className="sm:hidden flex items-center gap-1.5 text-sm min-w-0 h-8">
+        <span className="text-muted-foreground shrink-0">If</span>
+        <span className="font-semibold truncate">{conditionValue}</span>
+        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+        <a
+          href={redirectUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted-foreground hover:text-primary truncate transition-colors"
+        >
+          {displayUrl}
+        </a>
+      </div>
+    </>
+  );
+}
+
+function FlowSegment({ label, icon: SegmentIcon, iconClassName, children, isLast }) {
+  return (
+    <div
+      className={cn(
+        "flex h-9 items-center gap-1.5 px-2.5 min-w-0",
+        !isLast && "border-r border-border/50"
+      )}
+    >
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0 leading-none">
+        {label}
+      </span>
+      <SegmentIcon className={cn("h-3.5 w-3.5 shrink-0", iconClassName)} />
+      <div className="flex items-center gap-1 min-w-0 truncate">{children}</div>
     </div>
+  );
+}
+
+function FlowDivider() {
+  return (
+    <div className="flex h-9 items-center px-0.5 text-muted-foreground/30 shrink-0">
+      <ChevronRight className="h-3.5 w-3.5" />
+    </div>
+  );
+}
+
+function RuleActionsMenu({ rule, onToggle, onDelete }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="p-2 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          aria-label="Rule actions"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem
+          className="sm:hidden"
+          onClick={onToggle}
+        >
+          {rule.is_active ? "Disable rule" : "Enable rule"}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="sm:hidden" />
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete rule
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

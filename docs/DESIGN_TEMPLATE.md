@@ -543,6 +543,55 @@ Dashboard, People, Feed, Messages (badge), Analytics (conditional), Application,
 | Standard pages | Shown |
 | `/applications/:id/view` | Hidden |
 
+### 7.5 Back navigation
+
+All **“back to previous”** actions MUST use browser history first (`navigate(-1)`), then fall back to the logical parent route when history cannot go back (e.g. user opened a deep link directly).
+
+**Files:** `hooks/useGoBack.js`, `lib/navigationFallbacks.js`, `components/ui/BackButton.jsx`
+
+#### Behavior
+
+| Step | Action |
+|------|--------|
+| 1 | If React Router history index `history.state.idx > 0`, call `navigate(-1)` |
+| 2 | Otherwise navigate to the **fallback route** with `{ replace: true }` |
+
+**Examples:**
+
+- Links list → link detail → back → returns to links list (history).
+- Campaign → link detail → back → returns to campaign (history).
+- Direct URL to `/links/:id` (no prior in-app history) → `/links`.
+- Direct URL to `/campaigns/:id` → `/campaigns`.
+- 404 page with no history → `/` (dashboard).
+
+#### Fallback routes (`navigationFallbacks.js`)
+
+| Path pattern | Fallback |
+|--------------|----------|
+| `/links/:id` | `/links` |
+| `/campaigns/:id` | `/campaigns` |
+| All other paths | `/` |
+
+When adding a new detail/sub-page route, register its parent in `FALLBACK_RULES` inside `navigationFallbacks.js`.
+
+#### Implementation
+
+```jsx
+import { useGoBack } from "@/hooks/useGoBack";
+import BackButton from "@/components/ui/BackButton";
+
+// Icon button (detail page header)
+<BackButton fallback="/links" label="Back to links" className="mt-0.5" />
+
+// Text button (not-found / empty states)
+const goBack = useGoBack("/links");
+<Button variant="link" onClick={goBack}>← Back to links</Button>
+```
+
+Pass an explicit `fallback` when the page has a known parent; omit it only when `getNavigationFallback(pathname)` already covers the route.
+
+**Do not** use hardcoded `<Link to="…">` for back actions on detail or error pages. Auth flows that intentionally link to a fixed destination (e.g. Register → “Back to sign in” → `/login`) may keep explicit links.
+
 ---
 
 ## 8. Theme system
@@ -1845,9 +1894,11 @@ Filters in collapsible card (mobile collapsed by default):
   <p className="text-7xl font-light text-muted-foreground/40">404</p>
   <h1 className="text-2xl font-bold tracking-tight">Page not found</h1>
   <p className="text-sm text-muted-foreground max-w-sm">Description.</p>
-  <Button asChild><Link to="/">Back to dashboard</Link></Button>
+  <Button onClick={goBack}>Back to dashboard</Button>
 </div>
 ```
+
+Use `useGoBack("/")` for the handler; do not hardcode `<Link to="/">` for back actions (see §7.5).
 
 ---
 
@@ -1903,6 +1954,7 @@ Filters in collapsible card (mobile collapsed by default):
 - [ ] New routes added to `navItems.js` if needed
 - [ ] Mobile dock stays ≤ 6 items; overflow in MobileMoreMenu
 - [ ] Active state `match()` handles nested paths
+- [ ] Back actions use `useGoBack` / `BackButton` with history `-1` then route fallback (§7.5)
 
 ### Overlays
 - [ ] Mobile compact dialogs: `w-[calc(100vw-1.5rem)]`, not full-width (§11.9)

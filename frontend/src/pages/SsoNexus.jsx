@@ -5,9 +5,11 @@ import db from "@/api/openClient";
 import { sanitizeClientRedirect, storeSsoReturnTo } from "@/lib/ssoRedirect";
 import { APP_NAME } from "@/lib/settingsConfig";
 import { Button } from "@/components/ui/button";
+import { useGoBack } from "@/hooks/useGoBack";
 
 export default function SsoNexus() {
   const [searchParams] = useSearchParams();
+  const goBack = useGoBack("/login");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("Verifying your Nexus session…");
 
@@ -67,7 +69,7 @@ export default function SsoNexus() {
               <p className="mt-1 text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
-          <Button variant="outline" className="w-full" onClick={() => { window.location.assign("/login"); }}>
+          <Button variant="outline" className="w-full" onClick={goBack}>
             Back to login
           </Button>
         </div>

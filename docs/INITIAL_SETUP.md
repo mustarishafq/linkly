@@ -239,7 +239,7 @@ A Base44 export ships with its own default layout, colors, and component choices
 
 1. **Global shell** — Ensure `App.jsx` wraps the app with `ThemeProvider`, `QueryClientProvider`, `AuthProvider`, and `Toaster` as shown in DESIGN_TEMPLATE §2.
 2. **Tokens & theme** — Align `index.css` and `tailwind.config.js` with §3–§4 before touching individual pages.
-3. **Layout & navigation** — Refactor `AppLayout`, sidebar, and mobile bottom nav to §6–§7.
+3. **Layout & navigation** — Refactor `AppLayout`, sidebar, and mobile bottom nav to §6–§7. Detail and error pages must use `useGoBack` / `BackButton` (history `-1`, then route fallback) per §7.5.
 4. **Mobile glass dock** — Follow **[MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md)** for the bottom bar (see below).
 5. **Page by page** — For each route under `frontend/src/pages/`, apply the standard page template (title, description, primary action, responsive grid/cards).
 6. **Pre-ship** — Run through the checklist in DESIGN_TEMPLATE §28 before considering the migration complete.

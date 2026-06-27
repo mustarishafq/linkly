@@ -3,7 +3,10 @@ import db from "@/api/openClient";
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 
-import { ArrowLeft, MousePointerClick, Users, Target, Link2 } from "lucide-react";
+import { MousePointerClick, Users, Target, Link2 } from "lucide-react";
+import BackButton from "@/components/ui/BackButton";
+import { useGoBack } from "@/hooks/useGoBack";
+import { Button } from "@/components/ui/button";
 import StatCard from "@/components/ui/StatCard";
 import ClicksChart from "@/components/dashboard/ClicksChart";
 import DeviceChart from "@/components/dashboard/DeviceChart";
@@ -11,6 +14,7 @@ import { filterOfficialClicks } from "@/lib/linkPreview";
 
 export default function CampaignDetail() {
   const { id } = useParams();
+  const goBack = useGoBack("/campaigns");
   const [campaign, setCampaign] = useState(null);
   const [links, setLinks] = useState([]);
   const [clicks, setClicks] = useState([]);
@@ -43,7 +47,9 @@ export default function CampaignDetail() {
     return (
       <div className="text-center py-16">
         <p className="text-lg font-medium">Campaign not found</p>
-        <Link to="/campaigns" className="text-primary text-sm mt-2 inline-block">← Back</Link>
+        <Button variant="link" className="mt-2" onClick={goBack}>
+          ← Back to campaigns
+        </Button>
       </div>
     );
   }
@@ -56,9 +62,7 @@ export default function CampaignDetail() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link to="/campaigns" className="p-2 rounded-lg hover:bg-secondary transition-colors">
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
+        <BackButton fallback="/campaigns" label="Back to campaigns" />
         <div>
           <h1 className="text-xl font-bold">{campaign.name}</h1>
           {campaign.description && <p className="text-xs text-muted-foreground mt-0.5">{campaign.description}</p>}
