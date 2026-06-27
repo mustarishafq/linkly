@@ -1,0 +1,79 @@
+{
+  "name": "LinkNotificationRule",
+  "type": "object",
+  "properties": {
+    "link_id": {
+      "type": "string",
+      "description": "Associated short link ID"
+    },
+    "label": {
+      "type": "string",
+      "description": "Optional label for this notification rule"
+    },
+    "metric": {
+      "type": "string",
+      "enum": [
+        "clicks",
+        "views",
+        "unique_clicks",
+        "conversions",
+        "conversion_rate"
+      ],
+      "description": "Metric to monitor"
+    },
+    "notify_type": {
+      "type": "string",
+      "enum": [
+        "target",
+        "recurring"
+      ],
+      "description": "Notify once at target or on recurring intervals"
+    },
+    "target_value": {
+      "type": "number",
+      "description": "Target to reach for one-time alerts"
+    },
+    "trigger_mode": {
+      "type": "string",
+      "enum": [
+        "count",
+        "percent"
+      ],
+      "description": "Interval mode for recurring alerts"
+    },
+    "trigger_value": {
+      "type": "number",
+      "description": "Interval size for recurring alerts"
+    },
+    "is_triggered": {
+      "type": "boolean",
+      "description": "Whether a one-time target alert has already fired"
+    },
+    "subscriber_user_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User IDs subscribed to this rule"
+    },
+    "created_by_user_id": {
+      "type": "string",
+      "description": "User who created the rule"
+    },
+    "last_triggered_value": {
+      "type": "number",
+      "description": "Metric value at last notification (for interval tracking)"
+    },
+    "last_triggered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this rule last fired"
+    }
+  },
+  "required": [
+    "link_id",
+    "metric",
+    "trigger_mode",
+    "trigger_value"
+  ]
+}

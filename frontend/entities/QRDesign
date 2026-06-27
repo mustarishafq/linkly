@@ -1,0 +1,69 @@
+{
+  "name": "QRDesign",
+  "type": "object",
+  "properties": {
+    "link_id": {
+      "type": "string",
+      "description": "Associated short link ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Design name"
+    },
+    "fg_color": {
+      "type": "string",
+      "description": "Foreground/data color (hex)",
+      "default": "#000000"
+    },
+    "bg_color": {
+      "type": "string",
+      "description": "Background color (hex)",
+      "default": "#ffffff"
+    },
+    "eye_color": {
+      "type": "string",
+      "description": "Eye/corner square color (hex)",
+      "default": "#000000"
+    },
+    "style": {
+      "type": "string",
+      "enum": [
+        "square",
+        "rounded",
+        "dots"
+      ],
+      "default": "square"
+    },
+    "size": {
+      "type": "number",
+      "description": "Size in pixels",
+      "default": 300
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Optional logo image URL"
+    },
+    "logo_size": {
+      "type": "number",
+      "description": "Logo size as percentage of QR code",
+      "default": 20
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "global",
+        "custom"
+      ],
+      "description": "Whether this design was copied from the org default or customized"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Only one design per link can be active"
+    }
+  },
+  "required": [
+    "link_id",
+    "name"
+  ]
+}

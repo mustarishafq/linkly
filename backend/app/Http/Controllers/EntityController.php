@@ -1,0 +1,120 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\EntityService;
+use App\Services\LinkNotificationService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class EntityController extends Controller
+{
+    public function __construct(
+        private EntityService $entities,
+        private LinkNotificationService $linkNotifications,
+    ) {}
+
+    public function list(Request $request, string $entity): JsonResponse
+    {
+        $table = $this->entities->tableFor($entity);
+        if (! $table) {
+            return response()->json(['message' => 'Unknown entity'], 404);
+        }
+
+        $sortBy = $request->input('sortBy', '-created_date');
+        $limit = $request->input('limit', 200);
+        $all = $this->entities->fetchAll($table);
+        $rows = $this->entities->applyLimit($this->entities->sortRecords($all, $sortBy), $limit);
+
+        return response()->json($rows);
+    }
+
+    public function filter(Request $request, string $entity): JsonResponse
+    {
+        $table = $this->entities->tableFor($entity);
+        if (! $table) {
+            return response()->json(['message' => 'Unknown entity'], 404);
+        }
+
+        $where = $request->input('where', []);
+        $sortBy = $request->input('sortBy', '-created_date');
+        $limit = $request->input('limit', 200);
+
+        $all = $this->entities->fetchAll($table);
+        $filtered = array_values(array_filter($all, fn ($row) => $this->entities->matchesWhere($row, $where)));
+        $rows = $this->entities->applyLimit($this->entities->sortRecords($filtered, $sortBy), $limit);
+
+        return response()->json($rows);
+    }
+
+    public function show(string $entity, string $id): JsonResponse
+    {
+        $table = $this->entities->tableFor($entity);
+        if (! $table) {
+            return response()->json(['message' => 'Unknown entity'], 404);
+        }
+
+        return response()->json($this->entities->find($table, $id));
+    }
+
+    public function store(Request $request, string $entity): JsonResponse
+    {
+        $table = $this->entities->tableFor($entity);
+        if (! $table) {
+            return response()->json(['message' => 'Unknown entity'], 404);
+        }
+
+        $user = $request->attributes->get('auth_user');
+        $record = $this->entities->create($table, $entity, $request->all(), $user?->id);
+
+        if ($entity === 'ClickLog' && ! empty($record['link_id'])) {
+            $this->linkNotifications->evaluateForLink((int) $record['link_id']);
+        }
+
+        return response()->json($record);
+    }
+
+    public function bulkStore(Request $request, string $entity): JsonResponse
+    {
+        $table = $this->entities->tableFor($entity);
+        if (! $table) {
+            return response()->json(['message' => 'Unknown entity'], 404);
+        }
+
+        $items = $request->input('items', []);
+        if (! is_array($items)) {
+            $items = [];
+        }
+
+        $user = $request->attributes->get('auth_user');
+        $created = $this->entities->bulkCreate($table, $entity, $items, $user?->id);
+
+        return response()->json($created);
+    }
+
+    public function update(Request $request, string $entity, string $id): JsonResponse
+    {
+        $table = $this->entities->tableFor($entity);
+        if (! $table) {
+            return response()->json(['message' => 'Unknown entity'], 404);
+        }
+
+        $user = $request->attributes->get('auth_user');
+        $updated = $this->entities->update($table, $entity, $id, $request->all(), $user?->id);
+
+        return response()->json($updated);
+    }
+
+    public function destroy(Request $request, string $entity, string $id): JsonResponse
+    {
+        $table = $this->entities->tableFor($entity);
+        if (! $table) {
+            return response()->json(['message' => 'Unknown entity'], 404);
+        }
+
+        $user = $request->attributes->get('auth_user');
+        $deleted = $this->entities->delete($table, $entity, $id, $user?->id);
+
+        return response()->json($deleted);
+    }
+}
