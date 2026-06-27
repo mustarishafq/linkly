@@ -1,6 +1,8 @@
 # Event Webhook Integration Specification
 
-A portable contract for **event-driven HTTP webhooks** between EMZI satellite applications (emitters) and a central notification hub such as **EMZI Nexus Brain** (receiver).
+A portable contract for **event-driven HTTP webhooks** between EMZI **satellite applications** (emitters) and a central notification hub such as **EMZI Nexus Brain** (receiver).
+
+> **Scope:** Every EMZI app that emits outbound webhooks MUST conform to §2 (emitter) and document its domain events in the same format. Receivers (typically Brain) MUST conform to §3. Booking and Linkly are reference domains — not the only valid event prefixes.
 
 Use this document as:
 
@@ -96,10 +98,10 @@ Examples:
 
 | Event | Meaning |
 |-------|---------|
-| `booking.submitted` | New booking created, awaiting or skipping approval |
+| `booking.submitted` | New booking created (Booking app) |
 | `booking.confirmed` | Booking approved / confirmed |
-| `booking.rejected` | Booking rejected |
-| `booking.cancelled` | Booking cancelled |
+| `link.created` | New short link created (Linkly app) |
+| `user.approved` | User approved by admin (any app with approval workflow) |
 | `webhook.test` | Synthetic test delivery |
 
 **Emitter MUST** use stable, documented event strings. **Receiver SHOULD** treat unknown events as generic notifications (log + optional fallback UI) rather than hard-fail, unless security policy requires rejection.
@@ -415,16 +417,25 @@ To add events from another satellite app (e.g. complaints, leave, assets):
 
 ---
 
-## Appendix A — Reference Implementation
+## Appendix A — Reference implementations
 
-**EMZI Nexus Booking** implements this specification as follows:
+### EMZI Nexus Booking (`booking.*`)
 
 | Spec area | Implementation |
 |-----------|----------------|
 | Webhook delivery | Planned — not yet ported to Laravel |
-| Admin configuration | Settings → Webhooks tab (`frontend/src/pages/Settings.jsx`) |
-| Settings API | `GET/PATCH /api/settings` |
-| Entity triggers | `backend/app/Http/Controllers/EntityController.php` |
+| Admin configuration | Settings → Webhooks tab |
 | SSO identity linking | [nexus-sso-setup.md](./nexus-sso-setup.md) |
 
-Booking is the reference emitter for the `booking.*` event family. Other EMZI apps SHOULD conform to this document and may cite Booking as a worked example.
+Booking is the reference emitter for the `booking.*` event family.
+
+### Linkly (`link.*`, `user.*`)
+
+| Spec area | Implementation |
+|-----------|----------------|
+| Webhook delivery | `backend/app/Services/EventWebhookService.php` (fire-and-forget POST) |
+| Admin configuration | Settings → Notifications (`NotificationSettings.jsx`) |
+| Default events | `link.created`, `user.registered`, `user.approved`, `link.metric_threshold`, `webhook.test` |
+| Config storage | Single `event_webhook` row in `settings` (simpler than multi-webhook UUID model) |
+
+Other EMZI apps SHOULD conform to this document and may cite Booking or Linkly as worked examples.

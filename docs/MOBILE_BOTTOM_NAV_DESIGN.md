@@ -2,7 +2,9 @@
 
 Portable spec for recreating the Nexus **glass dock** bottom navigation across **mobile, tablet, and desktop**. Use this document in Figma, another codebase, or any design system.
 
-**Reference implementation:**
+> **Scope:** **Every** EMZI React app MUST match this visual and interaction spec for the bottom dock (height, glass, safe area, active indicator, mobile orb pattern where applicable). **Route labels and paths are configurable** — §9 lists Nexus Brain defaults; satellite apps supply their own `navItems.js` while keeping the same chrome.
+
+**Reference implementation (Nexus Brain hub):**
 
 | File | Purpose |
 |------|---------|
@@ -399,7 +401,9 @@ Used on tabs with unread counts (Notifications, Messages).
 
 ## 9. Navigation Map
 
-### Mobile dock tabs (`MOBILE_BOTTOM_NAV_ITEMS`)
+> **Satellite apps:** Keep §2–§8 and §14–§16 unchanged. Replace tab routes below with your app’s primary screens (typically 4–6 mobile tabs). Hub-only routes (People, Organization, Broadcast, etc.) may be omitted. Optional: center **Apps** orb linking to `/applications` when integrated with Nexus Brain.
+
+### Mobile dock tabs (`MOBILE_BOTTOM_NAV_ITEMS`) — Nexus Brain default
 
 | # | Label | Route | Type |
 |---|-------|-------|------|
@@ -414,7 +418,7 @@ Used on tabs with unread counts (Notifications, Messages).
 - Apps: `/applications` or `/applications/*`
 - More: active when current path matches any More sheet route
 
-### Desktop dock tabs (`buildDesktopNavItems`)
+### Desktop dock tabs (`buildDesktopNavItems`) — Nexus Brain default
 
 | Label | Route | Badge |
 |-------|-------|-------|
@@ -437,7 +441,7 @@ Used on tabs with unread counts (Notifications, Messages).
 
 **Analytics tab** shown when `user.role === 'admin'` OR Metabase dashboards exist.
 
-### More menu — mobile bottom sheet (`buildMobileMoreItems`)
+### More menu — mobile bottom sheet (`buildMobileMoreItems`) — Nexus Brain default
 
 Triggered by **More** tab. Not part of dock chrome.
 

@@ -1,8 +1,18 @@
-# Nexus Design Template
+# EMZI Nexus Design Template
 
-**Single source of truth** for building pages, features, and integrated systems inside **EMZI Nexus Brain**. Follow this document exactly so every system looks and behaves identically to Nexus.
+**Single source of truth** for UI and UX across **EMZI Nexus Brain** and every **satellite application** in the EMZI ecosystem. Follow this document exactly so every system looks and behaves the same.
 
-> When code changes, update this file to match. Reference implementation lives in `frontend/src/`.
+> **Scope:** Requirements in this file apply to **all** EMZI React frontends — Brain, Linkly, Booking, Pulse, and future apps. Paths like `frontend/src/` are conventions; adapt to your repo layout but keep the same tokens, components, and behavior. When code changes, update this file to match the canonical reference implementation.
+
+### Who must follow this
+
+| System type | Requirement |
+|-------------|-------------|
+| **Nexus Brain** (hub) | Full shell: TopBar, bottom nav, People, Applications, notifications, broadcasts, etc. |
+| **Satellite apps** (Linkly, Booking, …) | Same tokens, shadcn/ui, auth template, overlays, forms, loading/error states, mobile dock **visual spec**. Define your own routes in `navItems.js`; omit hub-only features (e.g. People grid) if not in scope. |
+| **New systems** | Copy the reference stack (§2), implement §28 pre-ship checklist before production. |
+
+Related portable specs: [docs/README.md](./README.md) (index), [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) (dock detail), [nexus-sso-setup.md](./nexus-sso-setup.md), [event-webhook-setup.md](./event-webhook-setup.md), [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md).
 
 ---
 
@@ -477,6 +487,8 @@ hover:bg-muted/70 focus-visible:ring-1 focus-visible:ring-ring
 
 **Files:** `BottomNav.jsx`, `glassStyles.js`, `navItems.js`, `AppLayout.jsx`
 
+> **Route map:** Tab labels and paths in §7.4 describe **Nexus Brain** defaults. Satellite apps MUST reuse the dock **visual spec** ([MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md)) but define their own `navItems.js` (typically 4–6 mobile tabs + optional Apps orb if integrated with Brain).
+
 #### Visual structure
 
 ```
@@ -547,7 +559,7 @@ Dashboard, People, Feed, Messages (badge), Analytics (conditional), Application,
 
 All **“back to previous”** actions MUST use browser history first (`navigate(-1)`), then fall back to the logical parent route when history cannot go back (e.g. user opened a deep link directly).
 
-**Files:** `hooks/useGoBack.js`, `lib/navigationFallbacks.js`, `components/ui/BackButton.jsx`
+**Required files (every satellite app):** `hooks/useGoBack.js`, `lib/navigationFallbacks.js`, `components/ui/BackButton.jsx`
 
 #### Behavior
 
@@ -556,23 +568,24 @@ All **“back to previous”** actions MUST use browser history first (`navigate
 | 1 | If React Router history index `history.state.idx > 0`, call `navigate(-1)` |
 | 2 | Otherwise navigate to the **fallback route** with `{ replace: true }` |
 
-**Examples:**
+**Examples (pattern — adapt routes to your app):**
 
-- Links list → link detail → back → returns to links list (history).
-- Campaign → link detail → back → returns to campaign (history).
-- Direct URL to `/links/:id` (no prior in-app history) → `/links`.
-- Direct URL to `/campaigns/:id` → `/campaigns`.
-- 404 page with no history → `/` (dashboard).
+- List → detail → back → returns to list (history).
+- Parent context → nested detail → back → returns to parent (history).
+- Direct URL to `/resources/:id` (no prior in-app history) → `/resources`.
+- 404 page with no history → `/` (dashboard/home).
 
 #### Fallback routes (`navigationFallbacks.js`)
 
-| Path pattern | Fallback |
-|--------------|----------|
-| `/links/:id` | `/links` |
-| `/campaigns/:id` | `/campaigns` |
+Maintain a **`FALLBACK_RULES`** array: each entry maps a path pattern to its list/parent route. Default unmatched paths to `/`.
+
+| Path pattern (example) | Fallback |
+|------------------------|----------|
+| `/resources/:id` | `/resources` |
+| `/items/:id` | `/items` |
 | All other paths | `/` |
 
-When adding a new detail/sub-page route, register its parent in `FALLBACK_RULES` inside `navigationFallbacks.js`.
+When adding a new detail or sub-page route, register its parent in `FALLBACK_RULES`. **Linkly example:** `/links/:id` → `/links`, `/campaigns/:id` → `/campaigns`.
 
 #### Implementation
 
@@ -581,11 +594,11 @@ import { useGoBack } from "@/hooks/useGoBack";
 import BackButton from "@/components/ui/BackButton";
 
 // Icon button (detail page header)
-<BackButton fallback="/links" label="Back to links" className="mt-0.5" />
+<BackButton fallback="/resources" label="Back to resources" className="mt-0.5" />
 
 // Text button (not-found / empty states)
-const goBack = useGoBack("/links");
-<Button variant="link" onClick={goBack}>← Back to links</Button>
+const goBack = useGoBack("/resources");
+<Button variant="link" onClick={goBack}>← Back to resources</Button>
 ```
 
 Pass an explicit `fallback` when the page has a known parent; omit it only when `getNavigationFallback(pathname)` already covers the route.
@@ -911,24 +924,16 @@ Use the shared `ConfirmDialog` wrapper (`frontend/src/components/ui/confirm-dial
 
 | Decision type | Confirm before | Example copy |
 |---------------|----------------|--------------|
-| **Mode / option switch** | Applying the new choice | “Use custom QR design?” / “Use organization default?” |
-| **Create with options** | Submitting the form | “Create link?” + summary of QR choice |
-| **Save settings** | PATCH to API | “Save organization QR default?” |
-| **Create / update record** | Persisting | “Create QR design?” / “Update QR design?” |
-| **Set active** | Changing which record is active | “Set active QR design?” |
-| **Delete** | Irreversible removal | “Delete QR design?” — use `destructive` styling |
+| **Mode / option switch** | Applying the new choice | “Use custom design?” / “Use organization default?” |
+| **Create with options** | Submitting the form | “Create record?” + summary of chosen options |
+| **Save settings** | PATCH to API | “Save default settings?” |
+| **Create / update record** | Persisting | “Create design?” / “Update design?” |
+| **Set active** | Changing which record is active | “Set as active?” |
+| **Delete** | Irreversible removal | “Delete this item?” — use `destructive` styling |
 
-**QR code flows (reference implementation):**
+Every app MUST wire confirms for its own high-impact flows. **Example (Linkly QR):** org default ↔ custom switch, create link with QR summary, save org default, create/update design, set active, delete — via `ConfirmDialog` on the relevant forms.
 
-| Component | Confirmed actions |
-|-----------|-------------------|
-| `LinkQrStyleSection` | Switch organization default ↔ custom |
-| `LinkFormDialog` | Create link (includes QR choice summary) |
-| `QrDefaultSettings` | Save org default |
-| `QRDesignForm` | Create / update design |
-| `QRDesignManager` | Set active, delete |
-
-Destructive confirms (delete app, delete design) use `destructive` on the confirm button. Applications delete may require typing the exact name (stricter pattern).
+Destructive confirms (delete app, delete record) use `destructive` on the confirm button. Stricter flows (e.g. delete application) MAY require typing the exact name.
 
 **Do not** rely on toast-only feedback as a substitute for confirmation on decisions the user explicitly makes.
 
@@ -1985,6 +1990,10 @@ Use `useGoBack("/")` for the handler; do not hardcode `<Link to="/">` for back a
 
 ## 29. Reference files
 
+Paths below use the monorepo convention `frontend/src/`. Every EMZI app should have equivalent files; names may differ slightly.
+
+### 29.1 Shared (required in every system)
+
 | Area | File |
 |------|------|
 | CSS tokens & ticker | `frontend/src/index.css` |
@@ -1997,15 +2006,20 @@ Use `useGoBack("/")` for the handler; do not hardcode `<Link to="/">` for back a
 | Bottom nav | `frontend/src/components/layout/BottomNav.jsx` |
 | Nav items | `frontend/src/components/layout/navItems.js` |
 | Mobile menu | `frontend/src/components/layout/MobileMoreMenu.jsx` |
-| Global search | `frontend/src/components/layout/GlobalSearch.jsx` |
 | Glass styles | `frontend/src/components/layout/glassStyles.js` |
+| Back navigation | `frontend/src/hooks/useGoBack.js`, `frontend/src/lib/navigationFallbacks.js`, `frontend/src/components/ui/BackButton.jsx` |
 | Theme | `frontend/src/components/theme/ThemeProvider.jsx`, `ThemeToggle.jsx` |
 | Toaster | `frontend/src/components/ui/sonner.jsx` |
 | Confirm dialog | `frontend/src/components/ui/confirm-dialog.jsx` |
-| QR default settings | `frontend/src/components/qr/QrDefaultSettings.jsx` |
-| Link QR picker | `frontend/src/components/links/LinkQrStyleSection.jsx` |
 | Auth pages | `frontend/src/pages/Login.jsx`, `Register.jsx`, `ForgotPassword.jsx` |
 | Settings | `frontend/src/pages/Settings.jsx` |
+| Mobile hook | `frontend/src/hooks/use-mobile.jsx` |
+
+### 29.2 Nexus Brain hub only (optional in satellite apps)
+
+| Area | File |
+|------|------|
+| Global search | `frontend/src/components/layout/GlobalSearch.jsx` |
 | Dashboard | `frontend/src/pages/Dashboard.jsx` |
 | Profile hero | `frontend/src/components/dashboard/ProfileDashboardHero.jsx` |
 | Profile about | `frontend/src/components/dashboard/ProfileAboutCard.jsx` |
@@ -2016,15 +2030,22 @@ Use `useGoBack("/")` for the handler; do not hardcode `<Link to="/">` for back a
 | App browser | `frontend/src/pages/ApplicationBrowser.jsx` |
 | SSO credential picker | `frontend/src/components/applications/SsoCredentialPickerDialog.jsx` |
 | Broadcast strip | `frontend/src/components/broadcasts/GlobalBroadcastStrip.jsx` |
-| Notification panel | `src/components/notifications/NotificationPanel.jsx` |
-| Notification item | `src/components/notifications/NotificationItem.jsx` |
-| Notification badges | `src/components/notifications/NotificationVisualBadges.jsx` |
-| Notification visuals | `src/lib/notificationVisuals.js` |
-| Notifications page | `src/pages/Notifications.jsx` |
+| Notification panel | `frontend/src/components/notifications/NotificationPanel.jsx` |
+| Notification item | `frontend/src/components/notifications/NotificationItem.jsx` |
+| Notification badges | `frontend/src/components/notifications/NotificationVisualBadges.jsx` |
+| Notification visuals | `frontend/src/lib/notificationVisuals.js` |
+| Notifications page | `frontend/src/pages/Notifications.jsx` |
 | Media constants | `frontend/src/lib/media.js` |
 | Brand color | `frontend/src/lib/imageColor.js` |
-| Mobile hook | `frontend/src/hooks/use-mobile.jsx` |
+
+### 29.3 Per-app domain (examples)
+
+| App | Example files |
+|-----|---------------|
+| **Linkly** (this repo) | `components/qr/*`, `components/links/*`, `pages/LinkDetail.jsx` |
+| **Nexus Booking** | Booking forms, calendar, resource entities |
+| **Nexus Pulse** | Complaints, departments, MCP layer |
 
 ---
 
-*Last updated from Nexus frontend codebase. When patterns change in code, update this document to match.*
+*Last updated from the EMZI Nexus reference frontend. When patterns change in the canonical implementation, update this document to match.*

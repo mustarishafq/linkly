@@ -1,6 +1,8 @@
 # EMZI Nexus — MCP API Catalog Specification
 
-Portable standard for exposing any EMZI Nexus application to **EMZI Nexus Brain**. Use this document when implementing or integrating MCP-ready REST APIs in Analytics, Care, or any future Nexus system.
+Portable standard for exposing **any EMZI Nexus satellite application** to **EMZI Nexus Brain**. Use this document when implementing or integrating MCP-ready REST APIs in Linkly, Booking, Pulse, Analytics, Care, or any future Nexus system.
+
+> **Scope:** All satellite apps that register as **Connected Systems** MUST implement `GET /api/mcp/v1/catalog` and route all MCP traffic under `/api/mcp/v1/`. File paths in checklists use Node (Pulse) or Laravel conventions — adapt to your stack; behavior must match.
 
 ---
 
@@ -384,18 +386,20 @@ The application does not know about MCP tool names. Brain performs the mapping u
 
 ## Implementation checklist (new system)
 
-- [ ] `server/config/mcp.js` — pagination defaults (`defaultPerPage`, `maxPerPage`)
-- [ ] `server/lib/mcpSettings.js` — parse/store settings, env key merge, `getMcpSettings()`
-- [ ] `server/routes/mcp.js` registered at prefix `/api/mcp/v1`
+Adapt paths to your stack (Laravel: `backend/routes/`, `backend/app/Services/Mcp/`; Node: `server/routes/mcp.js`, etc.):
+
+- [ ] MCP config — pagination defaults (`defaultPerPage`, `maxPerPage`)
+- [ ] Settings module — parse/store `mcp_api`, env key merge, `getMcpSettings()`
+- [ ] Routes registered at prefix `/api/mcp/v1`
 - [ ] `authenticateMcpClient` middleware (`X-API-Key` + Bearer)
-- [ ] `mcpRateLimit` middleware (per-client bucket from resolved settings)
-- [ ] `logMcpRequest` middleware
-- [ ] `mcpResponse` helper for standard envelope
-- [ ] Versioned routes and validation under `server/routes/mcp.js`, `server/validation/mcp/v1/`
-- [ ] Adapter services under `server/services/mcp/` (delegate to existing services)
-- [ ] Documentation module (e.g. `server/mcp/documentation/mcpV1Endpoints.js`)
+- [ ] Rate-limit middleware (per-client bucket from resolved settings)
+- [ ] Request logging middleware
+- [ ] Response helper for standard `{ success, data, meta }` envelope
+- [ ] Versioned routes and validation
+- [ ] Adapter services (delegate to existing business services)
+- [ ] Documentation module for catalog entries
 - [ ] `GET /api/mcp/v1/catalog` returning documented entries
-- [ ] Admin settings: `mcp_api` key in `settings` table + super-admin PATCH API + UI section
+- [ ] Admin settings: `mcp_api` in `settings` table + admin PATCH API + UI section
 - [ ] Feature tests: auth, validation, success, errors, permissions
 
 ---
@@ -441,9 +445,12 @@ Requirements:
 
 12. **Inbound routes:** Keep existing `/api/inbound/*` routes if present for direct integrations; MCP v1 is the Nexus Brain standard.
 
-Reference implementation: EMZI Nexus Pulse (`/api/mcp/v1/catalog`, `server/routes/mcp.js`, `server/mcp/`, `server/services/mcp/`, `server/lib/mcpSettings.js`).
+Reference implementations:
 
-Full spec: `emzi-nexus-mcp-catalog-spec.md` in the repository root.
+- **Node:** EMZI Nexus Pulse — `server/routes/mcp.js`, `server/mcp/`, `server/lib/mcpSettings.js`
+- **Laravel:** adapt to `backend/routes/api.php`, `backend/app/Http/Middleware/`, `backend/app/Services/Mcp/`
+
+Full spec: `docs/emzi-nexus-mcp-catalog-spec.md`.
 
 ---
 

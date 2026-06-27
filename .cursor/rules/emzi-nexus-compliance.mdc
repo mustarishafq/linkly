@@ -1,0 +1,39 @@
+---
+description: Before finishing changes, verify EMZI Nexus docs (UI, integrations, deploy)
+alwaysApply: true
+---
+
+# EMZI Nexus — finish checklist
+
+When completing **any** task that touches UI, API, auth, integrations, or deployment, verify against `docs/README.md` before saying the work is done.
+
+## Always read first
+
+- Index: `docs/README.md`
+- UI/UX: `docs/DESIGN_TEMPLATE.md` (pass §28 pre-ship for UI work)
+
+## Before marking complete
+
+**Frontend / UI** (`frontend/src/**`):
+
+- [ ] Semantic tokens only (`bg-card`, `text-foreground`) — no raw `slate-*` / `bg-white` on app pages
+- [ ] shadcn/ui + Lucide; page title + description pattern (DESIGN_TEMPLATE §4.3)
+- [ ] Back actions use `useGoBack` / `BackButton`, not hardcoded back links (§7.5)
+- [ ] User decisions use `ConfirmDialog` before persist/delete/mode switch (§11.3)
+- [ ] Mobile dialogs: `w-[calc(100vw-1.5rem)]`, horizontal footer on mobile (§11.9)
+- [ ] Glass dock matches `docs/MOBILE_BOTTOM_NAV_DESIGN.md` if nav changed
+
+**Backend / DB**:
+
+- [ ] Integer PKs on app tables — no UUID primary keys (`docs/INITIAL_SETUP.md`)
+- [ ] SSO changes match `docs/nexus-sso-setup.md`
+- [ ] Webhook changes match `docs/event-webhook-setup.md`
+- [ ] MCP routes under `/api/mcp/v1/` per `docs/emzi-nexus-mcp-catalog-spec.md`
+
+**Deploy / env**:
+
+- [ ] Split domains: `VITE_API_BASE_URL` points to API host (`docs/REACT_SPA_APACHE_HTACCESS.md`)
+
+## Report format
+
+If checks apply, end with a short **Compliance** note: what was verified or what still needs manual QA. Skip if the change was docs-only or unrelated (e.g. typo in a comment).

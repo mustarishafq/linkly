@@ -8,7 +8,7 @@ Monorepo with a Vite + React frontend and a Laravel API backend backed by MySQL.
 linkly/
 ├── frontend/     # React dashboard (Vite)
 ├── backend/      # Laravel API
-└── docs/         # Project documentation
+└── docs/         # Project documentation — start at docs/README.md
 ```
 
 ## Run locally

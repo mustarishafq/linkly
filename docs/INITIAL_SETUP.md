@@ -1,6 +1,8 @@
-# Initial Setup — Base44 to Open Source (Laravel + React)
+# Initial Setup — EMZI Satellite Application (Laravel + React)
 
-This guide explains how **Linkly** runs as a self-hosted monorepo after moving off **Base44** (hosted backend + SDK) to an open-source stack: **Laravel API** in `backend/` and **Vite + React** in `frontend/`.
+Portable setup guide for **any EMZI Nexus satellite application**: self-hosted **Laravel API** in `backend/` and **Vite + React** in `frontend/`. **Linkly** in this repository is the reference implementation; replace `{app}`, `{db}`, and domain-specific names with your project.
+
+> **Scope:** Universal requirements (architecture, design template, SSO, webhooks, MCP, deployment) apply to **every** satellite app. Sections marked **Linkly example** are migration notes for this repo only — skip them when bootstrapping a greenfield app.
 
 For day-to-day commands after setup, see the root [README.md](../README.md).
 
@@ -30,40 +32,41 @@ For day-to-day commands after setup, see the root [README.md](../README.md).
 
 ## Migration phases (master checklist)
 
-Use this order when moving a Base44 export to the Linkly stack. Check off each phase before production.
+Use this order when standing up or migrating any EMZI satellite app. Check off each phase before production.
 
 ```
 Phase 1 — Backend & database
-[ ] Create backend/ Laravel app; remove Base44 SDK and Express server/
-[ ] Integer PK migrations ($table->id()); run npm run migrate && npm run seed
-[ ] Wire frontend/src/api/openClient.js to Laravel /api/* routes
+[ ] Laravel app in backend/; integer PK migrations ($table->id())
+[ ] npm run migrate && npm run seed (or project equivalents)
+[ ] Frontend API client wired to Laravel /api/* routes
 
-Phase 2 — Legacy cleanup
-[ ] Delete root src/, entities/, server/ (canonical code lives in frontend/)
-[ ] Confirm no @base44/* packages remain
+Phase 2 — Legacy cleanup (if migrating from Base44 / Express)
+[ ] Remove platform SDK (@base44/*) and duplicate root src/, server/
+[ ] Canonical code lives in frontend/ + backend/
 
-Phase 3 — UI & navigation
+Phase 3 — UI & navigation (required — all systems)
 [ ] Rework pages per DESIGN_TEMPLATE.md (tokens, shadcn/ui, layout)
 [ ] Implement glass dock mobile nav per MOBILE_BOTTOM_NAV_DESIGN.md
+[ ] Back navigation: useGoBack / BackButton / navigationFallbacks (DESIGN_TEMPLATE §7.5)
 [ ] Pass DESIGN_TEMPLATE.md §28 pre-ship checklist
 
-Phase 4 — Auth & admin
+Phase 4 — Auth & admin (required — all systems)
 [ ] Register / login / JWT flow works
-[ ] User approval workflow (admin approves in User Management)
+[ ] User approval workflow if applicable (admin approves in User Management)
 [ ] Configure SMTP or DEV_SHOW_RESET_TOKEN for password reset locally
-[ ] Post-install settings: General, QR defaults
+[ ] Post-install settings: General, Security, domain-specific tabs
 
-Phase 5 — Linkly features
-[ ] Public short links (/r/:slug), domains, campaigns, analytics
-[ ] Link notification rules + in-app notifications (bell)
-[ ] Audit logs for admin (entity and user actions)
+Phase 5 — Domain features (per app)
+[ ] Implement core product entities and public routes
+[ ] In-app notifications and audit logs if required
+[ ] Linkly example: short links, campaigns, QR, analytics — see § Linkly features
 
-Phase 6 — Nexus integrations (optional)
+Phase 6 — Nexus integrations (optional — same contract for every app)
 [ ] Nexus SSO — nexus-sso-setup.md
 [ ] Event webhooks — event-webhook-setup.md
 [ ] MCP catalog — emzi-nexus-mcp-catalog-spec.md (implement /api/mcp/v1/*)
 
-Phase 7 — Production
+Phase 7 — Production (required — all systems)
 [ ] Build frontend with correct VITE_API_BASE_URL
 [ ] Deploy dist/ + .htaccess; Laravel on API host — REACT_SPA_APACHE_HTACCESS.md
 ```
@@ -72,15 +75,23 @@ Phase 7 — Production
 
 ## What changed
 
+| Area | Legacy / platform (typical) | EMZI satellite stack (standard) |
+|------|---------------------------|----------------------------------|
+| Backend | Hosted API / SDK (e.g. Base44) | **Laravel** (`backend/`) |
+| Frontend API client | Platform SDK | Plain **`fetch` + JWT** (e.g. `openClient.js`) |
+| Database | Platform-managed, often **UUID** PKs | **MySQL 8** you control |
+| Primary keys | UUID strings on entities & users | **`BIGINT UNSIGNED AUTO_INCREMENT`** (`$table->id()`) |
+| Auth | Platform session / tokens | **JWT** + optional [Nexus SSO](./nexus-sso-setup.md) |
+| Dev server | Single hosted dev URL | Vite `:5173` + Laravel `:8787` (or Herd) |
+| Entity schemas | Export JSON schemas | JSON as **documentation**; data in MySQL tables |
+
+### Linkly example (Base44 migration)
+
 | Area | Base44 (before) | Linkly (now) |
 |------|-----------------|--------------|
-| Backend | Base44 hosted API / SDK | **Laravel 13** (`backend/`) |
-| Frontend API client | `@base44/sdk` (or platform client) | **`frontend/src/api/openClient.js`** — plain `fetch` + JWT |
-| Database | Platform-managed, often **UUID string** primary keys | **MySQL 8** you control |
-| Primary keys | `VARCHAR(64)` / UUID strings on entities & users | **`BIGINT UNSIGNED AUTO_INCREMENT`** (`$table->id()`) |
-| Auth | Base44 session / platform tokens | **JWT** (`firebase/php-jwt`) + optional Nexus SSO |
-| Dev server | Single Base44 dev URL | Vite `:5173` + Laravel `:8787` (or Herd) |
-| Entity schemas | Base44 `entities/*` JSON | Same JSON kept as **documentation**; data lives in MySQL `entity_*` tables |
+| Backend | Base44 hosted API | Laravel 13 in `backend/` |
+| Client | `@base44/sdk` | `frontend/src/api/openClient.js` |
+| Tables | UUID PKs | Integer PKs + `entity_*` JSON payload pattern |
 
 ---
 
@@ -102,7 +113,7 @@ Phase 7 — Production
 └──────────────────────────┬──────────────────────────────────┘
                            │
                            ▼
-                    MySQL 8 (linkly)
+                    MySQL 8 ({db_name})
 ```
 
 Entity records use a **JSON `payload` column** plus integer metadata columns — the same pattern Base44 used conceptually, but IDs are assigned by MySQL, not UUID generators.
@@ -111,29 +122,31 @@ Entity records use a **JSON `payload` column** plus integer metadata columns —
 
 ## Project structure
 
+Standard monorepo layout for EMZI satellite apps:
+
 ```
-linkly/
-├── frontend/              # React SPA (active app — use this)
+{app}/
+├── frontend/              # React SPA (active app)
 │   ├── src/
-│   │   └── api/openClient.js   # Replaces Base44 SDK
-│   ├── entities/          # Entity JSON schemas (from Base44 export)
+│   │   └── api/openClient.js   # API client (replaces platform SDK)
+│   ├── entities/          # Entity JSON schemas (documentation)
 │   └── .env.example
 ├── backend/               # Laravel API
 │   ├── app/
 │   ├── database/migrations/
 │   ├── routes/api.php
 │   └── .env.example
-├── docs/                  # Setup & integration guides
+├── docs/                  # Shared EMZI specs + app setup
 └── package.json           # Root scripts (dev, migrate, seed)
 ```
 
-> **Note:** An older single-folder layout may still exist at the repo root. See [Legacy folder cleanup](#legacy-folder-cleanup).
+**Linkly example:** repo root is `linkly/`. See [Legacy folder cleanup](#legacy-folder-cleanup) if migrating from an older single-folder Base44 export.
 
 ---
 
 ## Remove Base44 dependencies
 
-When porting a Base44-exported project, remove platform-specific packages and imports.
+**Linkly example only** — when porting a Base44-exported project, remove platform-specific packages and imports.
 
 ### 1. Uninstall Base44 packages
 
@@ -183,7 +196,7 @@ Early self-hosted prototypes used `server/index.js` + `mysql2`. That stack is **
 
 ## Legacy folder cleanup
 
-After `frontend/` and `backend/` are working, remove duplicate legacy paths so editors and deploy scripts do not touch the wrong tree.
+**Linkly example only** — after `frontend/` and `backend/` are working, remove duplicate legacy paths.
 
 ### Delete when safe
 
@@ -218,9 +231,9 @@ Run `npm run dev` from the repo root and confirm the app loads from **`frontend/
 
 ## Rework the UI — follow DESIGN_TEMPLATE.md
 
-A Base44 export ships with its own default layout, colors, and component choices. After wiring the Laravel backend, **rework every page and shared component** so Linkly matches the EMZI Nexus system template.
+A platform export (e.g. Base44) ships with its own default layout. After wiring the Laravel backend, **rework every page and shared component** so the app matches the EMZI system template.
 
-**[DESIGN_TEMPLATE.md](./DESIGN_TEMPLATE.md)** is the single source of truth for how satellite apps (including Linkly) should look and behave inside the Nexus ecosystem. Treat it as mandatory, not optional styling guidance.
+**[DESIGN_TEMPLATE.md](./DESIGN_TEMPLATE.md)** is the single source of truth for how **all** satellite apps should look and behave. Treat it as mandatory, not optional styling guidance.
 
 ### What to rework
 
@@ -257,7 +270,7 @@ DESIGN_TEMPLATE covers layout at a high level; the **glass dock** spec is docume
 | Glass styling | `glassStyles.js`, frosted dock, `TopBar` + content padding |
 | Reference files | `BottomNav.jsx`, `navItems.js`, `AppLayout.jsx`, `use-mobile.jsx` |
 
-When reworking navigation during migration, match Linkly’s reference implementation under `frontend/src/components/layout/` and update MOBILE_BOTTOM_NAV_DESIGN.md if patterns change.
+When reworking navigation during migration, match the **visual spec** in your reference `frontend/src/components/layout/` and update MOBILE_BOTTOM_NAV_DESIGN.md if patterns change. Satellite apps define their own routes in `navItems.js` — do not copy Nexus Brain routes verbatim unless building the hub.
 
 ### Reference implementation
 
@@ -269,18 +282,18 @@ When you change UI patterns in code, update **DESIGN_TEMPLATE.md** so it stays i
 
 ## Optional — Nexus SSO (Nexus Brain)
 
-**[nexus-sso-setup.md](./nexus-sso-setup.md)** covers inbound SSO from **EMZI Nexus Brain** into Linkly. Brain signs a JWT; Linkly verifies it and issues a local session JWT.
+**[nexus-sso-setup.md](./nexus-sso-setup.md)** — portable contract for inbound SSO from **EMZI Nexus Brain** into **any satellite app**. Brain signs a JWT; your app verifies it and issues a local session JWT.
 
 ### When to configure
 
 - **Skip** for standalone installs with email/password only.
-- **Configure** when users open Linkly from a Nexus Brain app tile or need “Continue with EMZI Nexus Brain” on the login page.
+- **Configure** when users open your app from a Nexus Brain app tile or need “Continue with EMZI Nexus Brain” on the login page.
 
 ### How it works
 
 ```
-Nexus Brain                         Linkly
-───────────                         ──────
+Nexus Brain                         Your satellite app
+───────────                         ──────────────────
 App tile click  ──►  GET /sso/nexus?token=<JWT>&redirect_to=/dashboard
                            │
                            ▼
@@ -322,7 +335,7 @@ Production SPA must serve `/sso/nexus` via `index.html` (same `.htaccess` rules 
 2. Open **Settings → Security & SSO**.
 3. Enable SSO, set shared **secret** and **issuer** to match Brain.
 4. Set default role for new SSO users (`user` or `admin`).
-5. Copy the **callback URL** shown in the UI (e.g. `https://linkly.emzinexus.com/sso/nexus`) into Brain’s app registration.
+5. Copy the **callback URL** shown in the UI (e.g. `https://{frontend-domain}/sso/nexus`) into Brain’s app registration.
 
 ### SSO setup checklist
 
@@ -351,16 +364,16 @@ From [nexus-sso-setup.md](./nexus-sso-setup.md):
 
 ## Optional — Event webhooks (Nexus Brain)
 
-Linkly can emit **outbound HTTP webhooks** when domain events occur (new link, user approved, metric threshold, etc.) so a central hub such as **EMZI Nexus Brain** can deliver in-app notifications.
+Any satellite app can emit **outbound HTTP webhooks** when domain events occur so a central hub such as **EMZI Nexus Brain** can deliver in-app notifications.
 
-The full contract (payload shape, `X-Webhook-Secret`, recipient rules, acceptance tests) is in **[event-webhook-setup.md](./event-webhook-setup.md)**. Use that document when configuring the receiver or extending events.
+The full contract (payload shape, `X-Webhook-Secret`, recipient rules, acceptance tests) is in **[event-webhook-setup.md](./event-webhook-setup.md)**. **All emitters must conform** — event names and nested object keys differ per app, but delivery mechanics are identical.
 
 ### When to configure
 
 - **Skip** for local-only dev if you do not need cross-app notifications.
-- **Configure** when Linkly is a Nexus satellite app and Brain (or another receiver) should notify users on Linkly events.
+- **Configure** when your app is a Nexus satellite and Brain (or another receiver) should notify users on app events.
 
-### Defaults after seed
+### Defaults after seed (Linkly example)
 
 `SettingsSeeder` creates an `event_webhook` row (disabled by default) with these event keys:
 
@@ -393,7 +406,7 @@ From [event-webhook-setup.md](./event-webhook-setup.md):
 ```
 [ ] Receiver endpoint accepts POST with Content-Type: application/json
 [ ] Receiver validates X-Webhook-Secret against the shared secret
-[ ] Receiver handles Linkly events (link.*, user.*, webhook.test)
+[ ] Receiver handles your app's events (see event catalog in admin settings)
 [ ] Users have nexus_sso_id when routing to Brain (see nexus-sso-setup.md)
 [ ] Send webhook.test from settings → expect 2xx on receiver
 ```
@@ -407,22 +420,22 @@ From [event-webhook-setup.md](./event-webhook-setup.md):
 | Settings API | `PATCH /api/settings` with `event_webhook` patch (admin) |
 | Delivery | `backend/app/Services/EventWebhookService.php` |
 
-> **Note:** Webhook config records may use a UUID `id` in the portable spec ([event-webhook-setup.md §2.1](./event-webhook-setup.md#21-webhook-configuration-model)) for multi-webhook hubs. Linkly’s current install uses a **single** webhook config in `settings` — database **entity and user tables still use integer IDs**, not UUID primary keys.
+> **Note:** Webhook config may use a UUID `id` in the portable spec ([event-webhook-setup.md §2.1](./event-webhook-setup.md#21-webhook-configuration-model)) for multi-webhook hubs. A **single** webhook in `settings` is valid for simpler apps — database **entity and user tables still use integer IDs**, not UUID primary keys.
 
 ---
 
 ## Optional — MCP API catalog (Nexus Brain AI)
 
-**[emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md)** defines how EMZI satellite apps expose a versioned REST API layer so **EMZI Nexus Brain** can discover and call tools (e.g. list links, query analytics) via `GET /api/mcp/v1/catalog`.
+**[emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md)** defines how **every** EMZI satellite app exposes a versioned REST API layer so **EMZI Nexus Brain** can discover and call tools via `GET /api/mcp/v1/catalog`.
 
-Linkly is **not** an AI app — it only needs to expose secure `/api/mcp/v1/*` routes that delegate to existing Laravel services. Brain performs tool-to-REST mapping.
+Your app is **not** an AI app — it only needs secure `/api/mcp/v1/*` routes that delegate to existing backend services. Brain performs tool-to-REST mapping.
 
 ### When to implement
 
 - **Skip** for local-only dev or if Brain does not need to query Linkly programmatically.
-- **Implement** when Linkly should appear as a **Connected System** in Nexus Brain for assistants and automation.
+- **Implement** when your app should appear as a **Connected System** in Nexus Brain for assistants and automation.
 
-> **Current status:** The MCP layer is specified in [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md). Reference apps (e.g. EMZI Nexus Pulse) implement it fully; **Linkly does not yet ship `/api/mcp/v1/` routes** — add them during migration using the spec’s [AI implementation prompt](./emzi-nexus-mcp-catalog-spec.md#ai-implementation-prompt).
+> **Linkly status:** MCP layer is specified in [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md). Reference apps (e.g. EMZI Nexus Pulse) implement it fully; **Linkly does not yet ship `/api/mcp/v1/` routes** — add them using the spec’s [AI implementation prompt](./emzi-nexus-mcp-catalog-spec.md#ai-implementation-prompt).
 
 ### Architecture (after implementation)
 
@@ -432,7 +445,7 @@ Nexus Brain (MCP Server)
       │  1. GET /api/mcp/v1/catalog   (discover APIs)
       │  2. GET/POST /api/mcp/v1/...  (call APIs)
       ▼
-Linkly Laravel API (MCP middleware + thin controllers)
+Your app Laravel API (MCP middleware + thin controllers)
       │
       ▼
 Existing services (EntityService, AuthController, …)
@@ -461,20 +474,20 @@ Secrets are never returned after save (`api_key_set: true` on read). At least on
 
 ### Register in Nexus Brain
 
-1. Configure Linkly (admin UI and/or `MCP_API_KEY` in `backend/.env`).
+1. Configure your app (admin UI and/or `MCP_API_KEY` in `backend/.env`).
 2. In Brain → **Connected Systems**, register:
 
 | Field | Example |
 |-------|---------|
-| Base URL | `https://linklyapi.emzinexus.com` |
+| Base URL | `https://{api-domain}` |
 | API Key | Same as `MCP_API_KEY` |
-| Catalog URL | `https://linklyapi.emzinexus.com/api/mcp/v1/catalog` |
+| Catalog URL | `https://{api-domain}/api/mcp/v1/catalog` |
 
 3. Verify:
 
 ```bash
 curl -s -H "X-API-Key: YOUR_KEY" \
-  https://linklyapi.emzinexus.com/api/mcp/v1/catalog
+  https://{api-domain}/api/mcp/v1/catalog
 ```
 
 Expected: HTTP 200, `success: true`, and a `data` array of endpoint definitions.
@@ -500,17 +513,17 @@ Use the spec’s **[AI implementation prompt](./emzi-nexus-mcp-catalog-spec.md#a
 
 | Integration | Direction | Doc |
 |-------------|-----------|-----|
-| MCP catalog | Brain **calls** Linkly APIs | [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md) |
-| Event webhooks | Linkly **pushes** events to Brain | [event-webhook-setup.md](./event-webhook-setup.md) |
-| Nexus SSO | Brain **redirects** users into Linkly | [nexus-sso-setup.md](./nexus-sso-setup.md) |
+| MCP catalog | Brain **calls** your app APIs | [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md) |
+| Event webhooks | Your app **pushes** events to Brain | [event-webhook-setup.md](./event-webhook-setup.md) |
+| Nexus SSO | Brain **redirects** users into your app | [nexus-sso-setup.md](./nexus-sso-setup.md) |
 
 ---
 
 ## Database design — no UUID primary keys
 
-Linkly intentionally **does not** use UUID columns as primary keys on application tables.
+**Required for all EMZI Laravel satellite apps:** do **not** use UUID columns as primary keys on application tables.
 
-| Table | Primary key | Notes |
+| Table (Linkly example) | Primary key | Notes |
 |-------|-------------|-------|
 | `users` | `id` BIGINT | Auto-increment |
 | `entity_shortlink`, `entity_campaign`, … | `id` BIGINT | Payload in JSON column |
@@ -545,7 +558,7 @@ Foreign references in JSON payloads (`campaign_id`, etc.) should store **integer
 | **JSON `payload` in `entity_*`** | Legacy Base44 entities not yet normalized | `entity_shortlink`, `entity_campaign`, … |
 | **`settings` key-value JSON** | Small admin config blobs (SSO secrets, webhook toggles) | `nexus_sso`, `event_webhook` — not for first-class domain models |
 
-**QR code data (required pattern):**
+**QR code data (Linkly example — required pattern for this app):**
 
 | Table | Relationship | Service |
 |-------|--------------|---------|
@@ -564,7 +577,7 @@ When adding new features, prefer dedicated tables + services over stuffing field
 - **PHP** 8.3+ with extensions: `mbstring`, `openssl`, `pdo_mysql`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`
 - **Composer** 2.x
 - **MySQL** 8+
-- Optional: [Laravel Herd](https://herd.laravel.com) (project path `~/Herd/linkly` works with `linkly.test`)
+- Optional: [Laravel Herd](https://herd.laravel.com) (Linkly: `~/Herd/linkly` → `linkly.test`)
 
 ---
 
@@ -573,8 +586,8 @@ When adding new features, prefer dedicated tables + services over stuffing field
 ### 1. Clone and install dependencies
 
 ```bash
-git clone <repository-url> linkly
-cd linkly
+git clone <repository-url> {app}
+cd {app}
 npm run install:all
 ```
 
@@ -583,7 +596,7 @@ This runs `npm install` at the root and in `frontend/`, and `composer install` i
 ### 2. Create the database
 
 ```sql
-CREATE DATABASE IF NOT EXISTS linkly
+CREATE DATABASE IF NOT EXISTS {db_name}
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 ```
@@ -601,12 +614,12 @@ Edit `backend/.env`:
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=linkly
+DB_DATABASE={db_name}
 DB_USERNAME=root
 DB_PASSWORD=your_password
 
 JWT_SECRET=replace_with_a_long_random_secret_at_least_32_chars
-ADMIN_EMAIL=admin@linkly.dev
+ADMIN_EMAIL=admin@{your-domain}.dev
 ADMIN_PASSWORD=admin12345
 APP_BASE_URL=http://localhost:5173
 FRONTEND_URL=http://localhost:5173
@@ -657,12 +670,12 @@ npm run dev
 
 Sign in with the admin credentials from `backend/.env`.
 
-### 7. Optional — Laravel Herd
+### 7. Optional — Laravel Herd (Linkly example)
 
-If the repo lives under `~/Herd/linkly`, Herd can serve the API at `http://linkly.test`. Set in `frontend/.env`:
+If the repo lives under `~/Herd/{app}`, Herd can serve the API at `http://{app}.test`. Set in `frontend/.env`:
 
 ```bash
-VITE_DEV_API_TARGET=http://linkly.test
+VITE_DEV_API_TARGET=http://{app}.test
 ```
 
 ### Dev scripts (optional)
@@ -741,7 +754,7 @@ API: `GET` / `PATCH /api/settings` (admin JWT required). Secrets are redacted on
 
 ## Linkly features overview
 
-Core product behavior beyond auth and entity CRUD. Verify these after backend + UI migration.
+**Linkly example only** — core product behavior beyond auth and entity CRUD. Other satellite apps replace this section with their own domain checklist.
 
 ### Short links and public redirects
 
@@ -807,7 +820,7 @@ Sensitive fields (passwords, tokens, secrets) are stripped before persistence.
 ## Verify the migration
 
 1. **Health** — `GET http://127.0.0.1:8787/api/health` returns JSON.
-2. **Login** — Use admin email/password; token is stored in `localStorage` as `linkly_access_token`.
+2. **Login** — Use admin email/password; token is stored in `localStorage` (Linkly: `linkly_access_token`; use a consistent key per app).
 3. **Entities** — Create a short link in the UI; confirm `entity_shortlink` row has numeric `id`.
 4. **No Base44** — `package.json` / `frontend/package.json` must not list `@base44/*`; grep the repo for `base44` should return nothing in application code.
 5. **UI template** — Pages use shadcn/ui, design tokens, and layout patterns from [DESIGN_TEMPLATE.md](./DESIGN_TEMPLATE.md); mobile dock per [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md); pass DESIGN_TEMPLATE §28.
@@ -832,7 +845,7 @@ Do **not** alter migrations to use `uuid` primary keys — the frontend and `Ent
 
 ---
 
-## Entity list
+## Entity list (Linkly example)
 
 Entities are registered in `backend/config/linkly.php` and mirrored in `frontend/src/api/openClient.js`:
 
@@ -879,16 +892,16 @@ Typical production layout:
 
 | Role | Example URL | Deploy |
 |------|-------------|--------|
-| Frontend (SPA) | `https://linkly.emzinexus.com` | `frontend/dist/` |
-| Backend (Laravel API) | `https://linklyapi.emzinexus.com` | `backend/` with document root `backend/public` |
+| Frontend (SPA) | `https://{app}.example.com` | `frontend/dist/` |
+| Backend (Laravel API) | `https://api.{app}.example.com` | `backend/` with document root `backend/public` |
 
 **Do not** use `VITE_API_BASE_URL=/api` when the SPA and API are on different hosts. The SPA `.htaccess` will serve `index.html` for `/api/*`, so login returns HTML instead of JSON.
 
 **Before building**, set `frontend/.env`:
 
 ```bash
-VITE_API_BASE_URL=https://linklyapi.emzinexus.com/api
-VITE_NEXUS_BRAIN_URL=https://emzinexus.com
+VITE_API_BASE_URL=https://api.{app}.example.com/api
+VITE_NEXUS_BRAIN_URL=https://{nexus-brain-domain}
 VITE_APP_TIMEZONE=UTC
 
 npm run build
@@ -899,9 +912,9 @@ Vite bakes `VITE_*` into the JS bundle at build time — changing server env aft
 **On the API server**, set `backend/.env`:
 
 ```bash
-APP_URL=https://linklyapi.emzinexus.com
-APP_BASE_URL=https://linkly.emzinexus.com
-FRONTEND_URL=https://linkly.emzinexus.com
+APP_URL=https://api.{app}.example.com
+APP_BASE_URL=https://{app}.example.com
+FRONTEND_URL=https://{app}.example.com
 ```
 
 Then run `php artisan config:clear`. `FRONTEND_URL` controls CORS for browser requests from the SPA origin on `/api/*`.
@@ -935,7 +948,7 @@ Quick API check:
 
 ```bash
 curl -sS -o /dev/null -w "%{http_code} %{content_type}\n" \
-  -X POST https://linklyapi.emzinexus.com/api/auth/login \
+  -X POST https://api.{app}.example.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"wrong"}'
 ```
@@ -957,10 +970,11 @@ For symptom → fix tables (404 on routes, HTML from API, CORS errors), see [REA
 
 | Topic | Document |
 |-------|----------|
+| **Documentation index (start here)** | [docs/README.md](./README.md) |
 | Daily dev & deploy | [README.md](../README.md) |
+| **UI / system template (required — all apps)** | [DESIGN_TEMPLATE.md](./DESIGN_TEMPLATE.md) |
 | SPA Apache deploy & split domains (required for production) | [REACT_SPA_APACHE_HTACCESS.md](./REACT_SPA_APACHE_HTACCESS.md) |
-| Nexus SSO (optional — Brain login) | [nexus-sso-setup.md](./nexus-sso-setup.md) |
 | Mobile glass dock navigation | [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) |
-| Event webhooks (optional — Nexus Brain notifications) | [event-webhook-setup.md](./event-webhook-setup.md) |
-| MCP API catalog (optional — Nexus Brain AI / tools) | [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md) |
-| **UI / system template (required)** | [DESIGN_TEMPLATE.md](./DESIGN_TEMPLATE.md) |
+| Nexus SSO (optional — Brain login) | [nexus-sso-setup.md](./nexus-sso-setup.md) |
+| Event webhooks (optional — Brain notifications) | [event-webhook-setup.md](./event-webhook-setup.md) |
+| MCP API catalog (optional — Brain AI / tools) | [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md) |

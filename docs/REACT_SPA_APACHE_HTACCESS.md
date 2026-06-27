@@ -2,7 +2,9 @@
 
 Use this checklist whenever you deploy a **Vite** or **Create React App** project with **React Router** (`BrowserRouter`) to **Apache** (shared hosting, cPanel, or similar).
 
-Direct visits and refreshes on routes like `/login`, `/settings`, or `/links/abc` will **404** unless the server serves `index.html` for paths that are not real files.
+> **Scope:** Required for **every** EMZI satellite app frontend (Linkly, Booking, Pulse, etc.) that uses client-side routing. Replace `{spa-domain}` and `{api-domain}` with your production hosts.
+
+Direct visits and refreshes on routes like `/login`, `/settings`, or `/items/abc` will **404** unless the server serves `index.html` for paths that are not real files.
 
 ---
 
@@ -72,18 +74,18 @@ With `.htaccess` in place, any request to the **frontend** host that is not a re
 
 | Request | Host | Result |
 |---------|------|--------|
-| `GET /login` | `linkly.emzinexus.com` | `index.html` — correct (React Router handles `/login`) |
-| `POST /api/auth/login` | `linkly.emzinexus.com` | `index.html` — **wrong** (API expected JSON) |
-| `POST /api/auth/login` | `linklyapi.emzinexus.com` | JSON — correct |
+| `GET /login` | `{spa-domain}` | `index.html` — correct (React Router handles `/login`) |
+| `POST /api/auth/login` | `{spa-domain}` | `index.html` — **wrong** (API expected JSON) |
+| `POST /api/auth/login` | `{api-domain}` | JSON — correct |
 
 Symptoms after login: dashboard fails to load, Network tab shows `200` with `text/html` on `/api/*` requests, or errors like “API returned HTML instead of JSON”.
 
-### Linkly production example
+### Production example (split domains)
 
 | Role | URL |
 |------|-----|
-| Frontend (SPA) | `https://linkly.emzinexus.com` |
-| Backend (Laravel API) | `https://linklyapi.emzinexus.com` |
+| Frontend (SPA) | `https://{spa-domain}` |
+| Backend (Laravel API) | `https://{api-domain}` |
 
 ### Frontend — set API URL in `.env` before build
 
@@ -94,8 +96,8 @@ Edit `frontend/.env` with production values, then build and deploy `frontend/dis
 ```bash
 # frontend/.env
 VITE_APP_TIMEZONE=UTC
-VITE_API_BASE_URL=https://linklyapi.emzinexus.com/api
-VITE_NEXUS_BRAIN_URL=https://emzinexus.com
+VITE_API_BASE_URL=https://{api-domain}/api
+VITE_NEXUS_BRAIN_URL=https://{nexus-brain-domain}
 
 npm run build
 ```
@@ -109,9 +111,9 @@ For **local dev**, use `VITE_API_BASE_URL=/api` and `VITE_DEV_API_TARGET=http://
 In `backend/.env` on the **API** server:
 
 ```bash
-APP_URL=https://linklyapi.emzinexus.com
-APP_BASE_URL=https://linkly.emzinexus.com
-FRONTEND_URL=https://linkly.emzinexus.com
+APP_URL=https://{api-domain}
+APP_BASE_URL=https://{spa-domain}
+FRONTEND_URL=https://{spa-domain}
 ```
 
 - `APP_URL` — public URL of the Laravel API
@@ -126,7 +128,7 @@ php artisan config:clear
 
 ### Uploaded logos and `/storage/*` (split domains)
 
-QR code logos are uploaded to the API and served from `https://your-api.example.com/storage/logos/...`. On split domains the SPA loads those images cross-origin (for canvas export), so the API host must expose CORS on static storage files — not only on `/api/*`.
+QR code logos (or other uploaded assets) are served from `https://{api-domain}/storage/...`. On split domains the SPA loads those files cross-origin, so the API host must expose CORS on static storage files — not only on `/api/*`.
 
 **One-time on the API server** (after deploy or first clone):
 
@@ -154,12 +156,12 @@ location /storage/ {
 }
 ```
 
-The frontend also proxies cross-origin logo URLs through `GET /api/image-proxy` when needed (see `frontend/src/components/qr/QRCodePreview.jsx`). Rebuild the SPA after frontend changes: `npm run build`.
+The frontend MAY proxy cross-origin asset URLs through an API route (e.g. `GET /api/image-proxy`) when needed. Rebuild the SPA after frontend changes: `npm run build`.
 
 **Verify storage CORS:**
 
 ```bash
-curl -sSI "https://linklyapi.emzinexus.com/storage/logos/example.png" | grep -i access-control
+curl -sSI "https://{api-domain}/storage/logos/example.png" | grep -i access-control
 ```
 
 Expect `Access-Control-Allow-Origin: *` (or your SPA origin). A missing header causes browser errors like *No 'Access-Control-Allow-Origin' header* when editing QR designs with uploaded logos.
@@ -173,12 +175,12 @@ If you prefer `VITE_API_BASE_URL=/api` in production, serve **both** SPA and API
 ```bash
 # Should return application/json (e.g. 401), not text/html
 curl -sS -o /dev/null -w "%{http_code} %{content_type}\n" \
-  -X POST https://linklyapi.emzinexus.com/api/auth/login \
+  -X POST https://{api-domain}/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"wrong"}'
 ```
 
-In the browser DevTools → Network, login should call `https://linklyapi.emzinexus.com/api/auth/login`, not `https://linkly.emzinexus.com/api/...`.
+In the browser DevTools → Network, login should call `https://{api-domain}/api/auth/login`, not `https://{spa-domain}/api/...`.
 
 ---
 
@@ -235,7 +237,7 @@ Copy this block into new project README or deployment notes:
 2. Open `https://your-domain.com/login` directly — should show the login page, not Apache 404.
 3. Log in, go to an inner route, **refresh** — should stay on that route.
 4. In DevTools → Network, confirm JS/CSS requests return **200** (rewrite rules must not swallow asset paths).
-5. Log in and confirm API calls hit your **API host** (e.g. `linklyapi.emzinexus.com/api/...`) and return JSON.
+5. Log in and confirm API calls hit your **API host** (`{api-domain}/api/...`) and return JSON.
 
 ---
 
@@ -254,20 +256,13 @@ Copy this block into new project README or deployment notes:
 
 ---
 
-## Linkly reference
+## Reference: Linkly (this repo)
 
-**`.htaccess`**
-
-- Template (version controlled): `frontend/.htaccess`
-- After build (deploy this): `frontend/dist/.htaccess`
-- Build step: `vite build && cp .htaccess dist/.htaccess` in `frontend/package.json`
-
-**Production URLs**
-
-- Frontend: `https://linkly.emzinexus.com` — deploy `frontend/dist/`
-- API: `https://linklyapi.emzinexus.com` — deploy Laravel with document root `backend/public`
-
-**Env files**
-
-- Frontend: `frontend/.env` — set `VITE_API_BASE_URL` before `npm run build` (see `frontend/.env.example`)
-- Backend production vars: see `backend/.env.example` (`APP_URL`, `FRONTEND_URL`, `APP_BASE_URL`)
+| Item | Value |
+|------|-------|
+| `.htaccess` template | `frontend/.htaccess` |
+| After build | `frontend/dist/.htaccess` |
+| Build step | `vite build && cp .htaccess dist/.htaccess` in `frontend/package.json` |
+| SPA deploy | `frontend/dist/` |
+| API deploy | Laravel, document root `backend/public` |
+| Env examples | `frontend/.env.example`, `backend/.env.example` |

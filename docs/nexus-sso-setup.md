@@ -1,15 +1,19 @@
 # Nexus SSO Setup Guide
 
-**EMZI Nexus Booking** integrates with **EMZI Nexus Brain** (the parent identity hub) via JWT-based SSO. Nexus signs tokens with a shared secret; this app verifies them and issues a local JWT session.
+Portable contract for **JWT-based SSO** between **EMZI Nexus Brain** (identity hub) and **any satellite application**. Nexus signs tokens with a shared secret; your app verifies them and issues a local JWT session.
+
+> **Scope:** Every EMZI satellite app that supports “open from Brain” or “Continue with EMZI Nexus Brain” MUST implement the same endpoints, settings shape, and JWT rules documented here. Replace `{app}`, `{frontend-domain}`, and `{api-domain}` with your deployment values.
+
+**Linkly** in this repository is one reference implementation (`frontend/src/pages/SsoNexus.jsx`, `backend/app/Http/Controllers/SsoController.php`).
 
 ---
 
 ## How It Works
 
 ```
-Nexus Brain                          EMZI Nexus Booking
+Nexus Brain                          Your satellite app
 ───────────                          ──────────────────
-User clicks app tile    ──►   GET /sso/nexus?token=<JWT>&redirect_to=/calendar
+User clicks app tile    ──►   GET /sso/nexus?token=<JWT>&redirect_to=/dashboard
                                       │
                                       ▼
                               POST /api/sso/nexus/verify  { token }
@@ -19,14 +23,14 @@ User clicks app tile    ──►   GET /sso/nexus?token=<JWT>&redirect_to=/cale
                               Issue JWT Bearer token
                                       │
                                       ▼
-                              Redirect to /calendar (or redirect_to)
+                              Redirect to /dashboard (or redirect_to)
 ```
 
-**Inbound SSO** (Nexus → Booking): Nexus redirects users to `/sso/nexus` with a signed JWT.
+**Inbound SSO** (Nexus → your app): Nexus redirects users to `/sso/nexus` with a signed JWT.
 
-**Outbound link** (Booking → Nexus): The login page includes a “Continue with EMZI Nexus Brain” link that sends users to the Nexus Brain URL (`VITE_NEXUS_BRAIN_URL`).
+**Outbound link** (your app → Nexus): The login page includes a “Continue with EMZI Nexus Brain” link that sends users to the Nexus Brain URL (`VITE_NEXUS_BRAIN_URL`).
 
-**Sign-out** (Booking → Nexus): When the user signed in via SSO, sign-out sends them back to Nexus Brain using the stored `return_to` value (see [SSO sign-out](#sso-sign-out-return_to) below).
+**Sign-out** (your app → Nexus): When the user signed in via SSO, sign-out sends them back to Nexus Brain using the stored `return_to` value (see [SSO sign-out](#sso-sign-out-return_to) below).
 
 ---
 
@@ -158,9 +162,9 @@ In **EMZI Nexus Brain** (Connected Systems):
 1. Add or edit this app as a connected system.
 2. Set **Base URL / SSO Endpoint** to:
    ```
-   https://<your-booking-frontend-domain>/sso/nexus
+   https://{frontend-domain}/sso/nexus
    ```
-3. Set **API Key** to the same value as Booking’s shared secret.
+3. Set **API Key** to the same value as your app’s shared secret.
 4. Ensure Nexus signs JWTs with:
    - Algorithm: **HS256** (HMAC-SHA256 over `header.payload`)
    - Secret: the shared API key
@@ -168,15 +172,15 @@ In **EMZI Nexus Brain** (Connected Systems):
 Example redirect URL Nexus should send users to:
 
 ```
-https://booking.example.com/sso/nexus?token=<JWT>&redirect_to=/calendar&return_to=/dashboard
+https://{frontend-domain}/sso/nexus?token=<JWT>&redirect_to=/dashboard&return_to=/applications
 ```
 
 Optional query parameters:
 
 | Param | Description |
 |-------|-------------|
-| `redirect_to` | Preferred post-login path within this app (e.g. `/bookings`) |
-| `return_to` | Where to send the user after they sign out — a Nexus Brain path (e.g. `/applications`) or full URL on the same origin (e.g. `https://emzinexus.com/applications`). Relative paths are preferred. Stored in the browser for the session. |
+| `redirect_to` | Preferred post-login path within this app (e.g. `/dashboard`, `/bookings`) |
+| `return_to` | Where to send the user after they sign out — a Nexus Brain path (e.g. `/applications`) or full URL on the same origin. Relative paths are preferred. Stored in the browser for the session. |
 
 The JWT payload may also include `redirect_to` and `return_to` claims; the server sanitizes both before responding.
 
@@ -187,9 +191,9 @@ The JWT payload may also include `redirect_to` and `return_to` claims; the serve
 When a user launches this app from Nexus Brain, Nexus should pass `return_to` on the SSO URL or in the JWT. That value is preserved for the browser session so sign-out can return the user to Nexus.
 
 ```
-Nexus Brain                          EMZI Nexus Booking
+Nexus Brain                          Your satellite app
 ───────────                          ──────────────────
-Launch with return_to   ──►   GET /sso/nexus?token=…&return_to=/dashboard
+Launch with return_to   ──►   GET /sso/nexus?token=…&return_to=/applications
                                       │
                                       ▼
                               Store return_to (sessionStorage)
@@ -207,8 +211,8 @@ User clicks Sign out    ──►   Navigate to Nexus (before React re-render)
 
 | Source | Sanitized by | Allowed targets |
 |--------|--------------|-----------------|
-| `redirect_to` | `FRONTEND_URL` origins | Paths within this app (e.g. `/calendar`) or absolute URLs on the booking frontend origin |
-| `return_to` | **Expected Issuer URL** (+ `FRONTEND_URL` as fallback) | Paths relative to Nexus (e.g. `/dashboard`) or absolute URLs on the Nexus Brain origin |
+| `redirect_to` | `FRONTEND_URL` origins | Paths within this app (e.g. `/dashboard`) or absolute URLs on the app frontend origin |
+| `return_to` | **Expected Issuer URL** (+ `FRONTEND_URL` as fallback) | Paths relative to Nexus (e.g. `/applications`) or absolute URLs on the Nexus Brain origin |
 
 Implementation: `backend/app/Services/SsoRedirectService.php` (`sanitizeReturnTo`).
 
@@ -234,17 +238,17 @@ Implementation: `backend/app/Services/SsoRedirectService.php` (`sanitizeReturnTo
 
 ## Frontend Environment (outbound login)
 
-Set in the project root `.env` before building the frontend:
+Set in `frontend/.env` before building:
 
 ```env
-VITE_NEXUS_BRAIN_URL=https://emzinexus.com
-VITE_API_URL=https://api.booking.example.com/api
+VITE_NEXUS_BRAIN_URL=https://{nexus-brain-domain}
+VITE_API_BASE_URL=https://{api-domain}/api
 ```
 
 | Variable | Purpose |
 |----------|---------|
-| `VITE_NEXUS_BRAIN_URL` | Target for “Continue with EMZI Nexus Brain” on the login page, and the base URL used to resolve SSO sign-out destinations. Default if unset: `https://emzinexus.com` (`frontend/src/lib/nexusBrain.js`). |
-| `VITE_API_URL` | Backend API base used by the SSO landing page. Leave blank in dev to use Vite’s `/api` proxy. |
+| `VITE_NEXUS_BRAIN_URL` | Target for “Continue with EMZI Nexus Brain” on the login page, and the base URL used to resolve SSO sign-out destinations. |
+| `VITE_API_BASE_URL` | Backend API base used by the SSO landing page. Leave blank in dev to use Vite’s `/api` proxy. |
 
 This does **not** configure inbound SSO verification; that is entirely the backend `nexus_sso` setting.
 
@@ -306,11 +310,12 @@ Ensure these are set for correct redirects and CORS in production:
 ```env
 JWT_SECRET=<long-random-string>
 JWT_EXPIRES_IN=7d
-PORT=3001
-FRONTEND_URL=https://booking.example.com
+FRONTEND_URL=https://{frontend-domain}
 ```
 
 `FRONTEND_URL` supports comma-separated origins for CORS and is used when sanitizing absolute `redirect_to` URLs. It is **not** used for `return_to`; that uses the **Expected Issuer URL** from SSO settings instead.
+
+(Laravel apps may also set `APP_URL` to the API origin; Node apps may use `PORT` — framework-specific vars do not change the SSO contract.)
 
 ---
 
@@ -332,20 +337,20 @@ Verify endpoint is rate-limited to **10 requests/minute** per IP.
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | `SSO is not configured` | SSO disabled or empty secret | Enable SSO and set API key (≥ 32 chars) in Settings |
-| `Invalid token signature` | Secret mismatch between Nexus and Booking | Align API keys on both sides |
+| `Invalid token signature` | Secret mismatch between Nexus and your app | Align API keys on both sides |
 | `Invalid token issuer` | `iss` claim ≠ Expected Issuer URL | Match issuer URL or clear issuer field to disable check |
 | `Token has expired` | JWT `exp` in the past | Nexus must issue fresh tokens |
 | `Token missing sub claim` | No Nexus user ID in JWT | Nexus must include `sub` |
-| `User account is not active` | User not approved in Booking | Approve user in **Users** |
+| `User account is not active` | User not approved | Approve user in **User Management** (if your app uses approval workflow) |
 | Blank page at `/sso/nexus` | SPA not configured for client routing | Add Apache `.htaccess` — see [REACT_SPA_APACHE_HTACCESS.md](./REACT_SPA_APACHE_HTACCESS.md) |
 | Sign out goes to `/login` instead of Nexus | `return_to` missing, rejected, or issuer not configured | Pass `return_to` from Nexus on SSO launch; set **Expected Issuer URL** to the Nexus Brain base URL; ensure `VITE_NEXUS_BRAIN_URL` matches |
 | Sign out lands on Nexus root with `?return_to=` in the URL | Nexus passed a full absolute URL and an older build used query-param-only logout | Rebuild frontend; prefer relative paths like `/applications` on SSO launch; current builds navigate directly to Nexus paths/URLs on the same origin |
 | Brief flash of login page on SSO sign-out | React auth state cleared before navigation (fixed in current builds) | Rebuild frontend; logout now calls `window.location.replace()` before clearing auth state |
-| API errors from SSO page | Wrong `VITE_API_URL` or CORS | Set `VITE_API_URL` and backend `FRONTEND_URL` for production |
+| API errors from SSO page | Wrong API base URL or CORS | Set `VITE_API_BASE_URL` and backend `FRONTEND_URL` for production |
 
 ---
 
-## Related Code
+## Related Code (Linkly reference)
 
 | Area | Location |
 |------|----------|
@@ -358,4 +363,4 @@ Verify endpoint is rate-limited to **10 requests/minute** per IP.
 | Nexus Brain URL / logout redirect | `frontend/src/lib/nexusBrain.js` |
 | Database schema | `backend/database/migrations/` |
 | Default SSO settings | `backend/database/seeders/SettingsSeeder.php` |
-| Outgoing event webhooks (`nexus_sso_id`) | Not yet implemented in Laravel — see [event-webhook-setup.md](./event-webhook-setup.md) |
+| Outgoing event webhooks (`nexus_sso_id`) | [event-webhook-setup.md](./event-webhook-setup.md) |
