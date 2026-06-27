@@ -53,15 +53,24 @@ class SsoRedirectService
         return self::DEFAULT_REDIRECT;
     }
 
-    public function sanitizeReturnTo(?string $value, array $allowedOrigins = []): ?string
+    public function sanitizeReturnTo(?string $value, array $allowedOrigins = [], ?string $nexusOrigin = null): ?string
     {
         $raw = trim((string) $value);
         if ($raw === '') {
             return null;
         }
 
+        $returnToOrigins = $allowedOrigins;
+        $nexusOriginNormalized = $this->normalizeOrigin($nexusOrigin);
+        if ($nexusOriginNormalized !== null && ! in_array($nexusOriginNormalized, $returnToOrigins, true)) {
+            $returnToOrigins[] = $nexusOriginNormalized;
+        }
+
         if (str_starts_with($raw, '/') && ! str_starts_with($raw, '//')) {
-            return $this->sanitizeRedirectPath($raw);
+            $path = $this->sanitizeRedirectPath($raw);
+
+            // Relative return_to targets Nexus Brain, not this app.
+            return $nexusOriginNormalized !== null ? $path : null;
         }
 
         $parsed = parse_url($raw);
@@ -69,12 +78,29 @@ class SsoRedirectService
             $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
             $origin = $parsed['scheme'].'://'.$parsed['host'].$port;
 
-            if (in_array($origin, $allowedOrigins, true)) {
+            if (in_array($origin, $returnToOrigins, true)) {
                 return $raw;
             }
         }
 
         return null;
+    }
+
+    private function normalizeOrigin(?string $url): ?string
+    {
+        $raw = trim((string) $url);
+        if ($raw === '') {
+            return null;
+        }
+
+        $parsed = parse_url($raw);
+        if (! $parsed || empty($parsed['scheme']) || empty($parsed['host'])) {
+            return null;
+        }
+
+        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+
+        return $parsed['scheme'].'://'.$parsed['host'].$port;
     }
 
     private function sanitizeRedirectPath(string $path): string

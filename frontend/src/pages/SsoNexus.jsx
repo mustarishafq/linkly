@@ -21,6 +21,10 @@ export default function SsoNexus() {
       return;
     }
 
+    if (returnTo) {
+      storeSsoReturnTo(returnTo);
+    }
+
     let cancelled = false;
 
     async function verify() {

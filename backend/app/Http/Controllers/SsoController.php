@@ -71,7 +71,8 @@ class SsoController extends Controller
         );
         $returnTo = $this->redirects->sanitizeReturnTo(
             $request->input('return_to') ?: $request->query('return_to') ?: ($claims['return_to'] ?? null),
-            $allowedOrigins
+            $allowedOrigins,
+            $config['issuer'] ?: null
         );
 
         $safeUser = $this->jwt->toSafeUser($user);

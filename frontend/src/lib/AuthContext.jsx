@@ -1,4 +1,5 @@
 import db from "@/api/openClient";
+import { getNexusBrainLogoutUrl } from "@/lib/nexusBrain";
 import { consumeSsoReturnTo } from "@/lib/ssoRedirect";
 
 import React, { createContext, useState, useContext, useEffect } from 'react';
@@ -92,7 +93,9 @@ export const AuthProvider = ({ children }) => {
 
     if (shouldRedirect && typeof window !== "undefined") {
       const ssoReturnTo = consumeSsoReturnTo();
-      window.location.assign(ssoReturnTo || "/login");
+      window.location.assign(
+        ssoReturnTo ? getNexusBrainLogoutUrl(ssoReturnTo) : "/login"
+      );
     }
   };
 
