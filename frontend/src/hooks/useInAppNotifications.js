@@ -6,10 +6,14 @@ import { useAuth } from "@/lib/AuthContext";
 const POLL_INTERVAL_MS = 30000;
 const TOAST_SEEN_KEY = "linkly_toast_seen_notifications";
 
+function normalizeNotificationId(id) {
+  return String(id);
+}
+
 function loadSeenIds() {
   try {
-    const raw = sessionStorage.getItem(TOAST_SEEN_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
+    const raw = window.localStorage.getItem(TOAST_SEEN_KEY);
+    return raw ? new Set(JSON.parse(raw).map(normalizeNotificationId)) : new Set();
   } catch {
     return new Set();
   }
@@ -17,10 +21,18 @@ function loadSeenIds() {
 
 function saveSeenIds(ids) {
   try {
-    sessionStorage.setItem(TOAST_SEEN_KEY, JSON.stringify(Array.from(ids).slice(-200)));
+    window.localStorage.setItem(
+      TOAST_SEEN_KEY,
+      JSON.stringify(Array.from(ids).slice(-200))
+    );
   } catch {
     // Ignore storage errors.
   }
+}
+
+function markIdsSeen(ids, seenSet) {
+  ids.forEach((id) => seenSet.add(normalizeNotificationId(id)));
+  saveSeenIds(seenSet);
 }
 
 export function useInAppNotifications() {
@@ -30,9 +42,30 @@ export function useInAppNotifications() {
   const [loading, setLoading] = useState(false);
   const pollStartedAt = useRef(new Date().toISOString());
   const toastSeenRef = useRef(loadSeenIds());
+  const readyForToastsRef = useRef(false);
+
+  const showToast = useCallback((item) => {
+    const id = normalizeNotificationId(item.id);
+    if (toastSeenRef.current.has(id)) return;
+
+    toastSeenRef.current.add(id);
+    saveSeenIds(toastSeenRef.current);
+
+    toast.success(item.title, {
+      description: item.body,
+      action: item.link_id
+        ? {
+            label: "View link",
+            onClick: () => {
+              window.location.assign(`/links/${item.link_id}`);
+            },
+          }
+        : undefined,
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) return [];
 
     setLoading(true);
     try {
@@ -42,15 +75,18 @@ export function useInAppNotifications() {
       ]);
       setNotifications(list);
       setUnreadCount(countData?.count ?? 0);
+      markIdsSeen(list.map((item) => item.id), toastSeenRef.current);
+
+      return list;
     } catch {
-      // Keep existing state on transient failures.
+      return [];
     } finally {
       setLoading(false);
     }
   }, [isAuthenticated]);
 
   const poll = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !readyForToastsRef.current) return;
 
     try {
       const data = await db.notifications.poll(pollStartedAt.current);
@@ -66,31 +102,16 @@ export function useInAppNotifications() {
           );
         });
 
-        incoming.forEach((item) => {
-          if (toastSeenRef.current.has(item.id)) return;
-          toastSeenRef.current.add(item.id);
-          saveSeenIds(toastSeenRef.current);
-
-          toast.success(item.title, {
-            description: item.body,
-            action: item.link_id
-              ? {
-                  label: "View link",
-                  onClick: () => {
-                    window.location.assign(`/links/${item.link_id}`);
-                  },
-                }
-              : undefined,
-          });
-        });
+        incoming.forEach((item) => showToast(item));
       }
     } catch {
       // Ignore polling errors.
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, showToast]);
 
   const markRead = useCallback(async (id) => {
     await db.notifications.markRead(id);
+    markIdsSeen([id], toastSeenRef.current);
     setNotifications((current) =>
       current.map((item) => (item.id === id ? { ...item, is_read: true } : item))
     );
@@ -99,23 +120,42 @@ export function useInAppNotifications() {
 
   const markAllRead = useCallback(async () => {
     await db.notifications.markAllRead();
-    setNotifications((current) => current.map((item) => ({ ...item, is_read: true })));
+    setNotifications((current) => {
+      markIdsSeen(current.map((item) => item.id), toastSeenRef.current);
+
+      return current.map((item) => ({ ...item, is_read: true }));
+    });
     setUnreadCount(0);
   }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
+      readyForToastsRef.current = false;
       setNotifications([]);
       setUnreadCount(0);
       return;
     }
 
-    pollStartedAt.current = new Date().toISOString();
-    refresh();
-    poll();
+    let cancelled = false;
+
+    async function initialize() {
+      readyForToastsRef.current = false;
+      pollStartedAt.current = new Date().toISOString();
+      await refresh();
+
+      if (cancelled) return;
+
+      readyForToastsRef.current = true;
+    }
+
+    initialize();
 
     const interval = window.setInterval(poll, POLL_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    return () => {
+      cancelled = true;
+      readyForToastsRef.current = false;
+      window.clearInterval(interval);
+    };
   }, [isAuthenticated, refresh, poll]);
 
   return {

@@ -75,7 +75,7 @@ class InAppNotificationService
                 $since = SqlDate::now(SqlDate::parse($sinceIso));
                 $query->where('created_date', '>', $since);
             } catch (\Throwable) {
-                // Ignore invalid timestamps and return all unread.
+                return [];
             }
         }
 
