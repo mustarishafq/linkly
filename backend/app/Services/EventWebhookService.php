@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Support\EventWebhookMetadata;
+use App\Support\WebhookDeliveryResult;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -61,10 +63,10 @@ class EventWebhookService
                     $domainKey => $domainObject,
                 ];
 
-                $this->sendPayload(
+                $this->deliverPayload(
                     trim((string) $webhook['url']),
                     (string) $webhook['secret'],
-                    $payload
+                    $payload,
                 );
             }
         }
@@ -91,16 +93,16 @@ class EventWebhookService
     }
 
     /** @param  array<string, mixed>  $payload */
-    public function sendTestPayload(array $webhook, array $payload): bool
+    public function sendTestPayload(array $webhook, array $payload): WebhookDeliveryResult
     {
         $url = trim((string) ($webhook['url'] ?? ''));
         $secret = (string) ($webhook['secret'] ?? '');
 
         if ($url === '' || strlen($secret) < 32) {
-            return false;
+            return WebhookDeliveryResult::failure('Webhook URL and secret are required.');
         }
 
-        return $this->sendPayload($url, $secret, $payload, true);
+        return $this->deliverPayload($url, $secret, $payload, true);
     }
 
     private function buildActionUrl(?string $actionPath): string
@@ -112,35 +114,101 @@ class EventWebhookService
     }
 
     /** @param  array<string, mixed>  $payload */
-    private function sendPayload(string $url, string $secret, array $payload, bool $throwOnFailure = false): bool
-    {
+    private function deliverPayload(
+        string $url,
+        string $secret,
+        array $payload,
+        bool $logFailure = false,
+    ): WebhookDeliveryResult {
         try {
             $response = Http::timeout(10)
                 ->withHeaders([
                     'X-Webhook-Secret' => $secret,
                     'User-Agent' => self::USER_AGENT,
-                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
                 ])
-                ->post($url, $payload);
+                ->withBody(json_encode($payload, JSON_THROW_ON_ERROR), 'application/json')
+                ->post($url);
 
-            if ($throwOnFailure && ! $response->successful()) {
-                Log::warning('Event webhook test delivery failed', [
-                    'event' => $payload['event'] ?? null,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-
-                return false;
+            if ($response->successful()) {
+                return WebhookDeliveryResult::success($response->status());
             }
 
-            return $response->successful();
-        } catch (\Throwable $exception) {
-            Log::warning('Event webhook delivery failed', [
-                'event' => $payload['event'] ?? null,
-                'message' => $exception->getMessage(),
-            ]);
+            $bodySnippet = $this->bodySnippet($response->body());
+            $message = $this->failureMessage($response->status(), $bodySnippet);
 
-            return false;
+            if ($logFailure) {
+                Log::warning('Event webhook test delivery failed', [
+                    'event' => $payload['event'] ?? null,
+                    'url' => $url,
+                    'status' => $response->status(),
+                    'body' => $bodySnippet,
+                ]);
+            }
+
+            return WebhookDeliveryResult::failure($message, $response->status(), $bodySnippet);
+        } catch (ConnectionException $exception) {
+            $message = 'Could not connect to the webhook URL. Check the URL and that outbound HTTPS is allowed from this server.';
+
+            if ($logFailure) {
+                Log::warning('Event webhook test delivery failed', [
+                    'event' => $payload['event'] ?? null,
+                    'url' => $url,
+                    'message' => $exception->getMessage(),
+                ]);
+            } else {
+                Log::warning('Event webhook delivery failed', [
+                    'event' => $payload['event'] ?? null,
+                    'url' => $url,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+
+            return WebhookDeliveryResult::failure($message);
+        } catch (\Throwable $exception) {
+            if ($logFailure) {
+                Log::warning('Event webhook test delivery failed', [
+                    'event' => $payload['event'] ?? null,
+                    'url' => $url,
+                    'message' => $exception->getMessage(),
+                ]);
+            } else {
+                Log::warning('Event webhook delivery failed', [
+                    'event' => $payload['event'] ?? null,
+                    'url' => $url,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+
+            return WebhookDeliveryResult::failure($exception->getMessage());
         }
+    }
+
+    private function failureMessage(int $status, ?string $bodySnippet): string
+    {
+        return match (true) {
+            $status === 401 => 'Receiver rejected the shared secret (HTTP 401). Use the same secret on both sides.',
+            $status === 404 => 'Webhook URL not found (HTTP 404). Check the receiver endpoint path.',
+            $status === 405 => 'Receiver does not accept POST requests (HTTP 405).',
+            $status === 422 => 'Receiver rejected the payload (HTTP 422).'.($bodySnippet ? " {$bodySnippet}" : ''),
+            $status >= 500 => "Receiver server error (HTTP {$status}).",
+            default => "Receiver returned HTTP {$status}.".($bodySnippet ? " {$bodySnippet}" : ''),
+        };
+    }
+
+    private function bodySnippet(?string $body): ?string
+    {
+        if ($body === null || $body === '') {
+            return null;
+        }
+
+        $decoded = json_decode($body, true);
+        if (is_array($decoded) && isset($decoded['message']) && is_string($decoded['message'])) {
+            return $decoded['message'];
+        }
+
+        $plain = trim(preg_replace('/\s+/', ' ', strip_tags($body)) ?? '');
+
+        return $plain !== '' ? mb_substr($plain, 0, 200) : null;
     }
 }

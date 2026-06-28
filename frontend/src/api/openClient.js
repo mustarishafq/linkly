@@ -102,6 +102,10 @@ async function request(path, options = {}) {
     error.status = response.status;
     // @ts-ignore
     error.code = payload?.code;
+    // @ts-ignore
+    error.receiverStatus = payload?.receiver_status;
+    // @ts-ignore
+    error.receiverBody = payload?.receiver_body;
     throw error;
   }
 

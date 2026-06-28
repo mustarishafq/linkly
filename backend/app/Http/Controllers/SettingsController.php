@@ -289,10 +289,15 @@ class SettingsController extends Controller
         }
 
         $actor = $request->attributes->get('auth_user');
-        $delivered = $this->linkWebhooks->sendTest($webhook, $actor);
+        $result = $this->linkWebhooks->sendTest($webhook, $actor);
 
-        if (! $delivered) {
-            return $this->error('delivery_failed', 'Test webhook delivery failed. Check the URL and secret.', 502);
+        if (! $result->ok) {
+            return response()->json([
+                'code' => 'delivery_failed',
+                'message' => $result->message ?? 'Test webhook delivery failed. Check the URL and secret.',
+                'receiver_status' => $result->status,
+                'receiver_body' => $result->receiverBody,
+            ], 502);
         }
 
         return response()->json(['ok' => true, 'message' => 'Test webhook sent']);

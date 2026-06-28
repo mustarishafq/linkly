@@ -153,7 +153,8 @@ export default function NotificationSettings() {
       await db.settings.testEventWebhook(webhook.id);
       toast.success("Test webhook sent");
     } catch (err) {
-      setError(err?.message || "Test webhook delivery failed");
+      const detail = err?.receiverStatus ? ` (receiver HTTP ${err.receiverStatus})` : "";
+      setError((err?.message || "Test webhook delivery failed") + detail);
     } finally {
       setTestingId("");
     }

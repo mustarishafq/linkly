@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\WebhookDeliveryResult;
 use Illuminate\Support\Facades\DB;
 
 class LinkWebhookService
@@ -140,7 +141,7 @@ class LinkWebhookService
         );
     }
 
-    public function sendTest(array $webhook, object $actor): bool
+    public function sendTest(array $webhook, object $actor): WebhookDeliveryResult
     {
         $now = now()->utc()->toIso8601String();
         $actorSsoId = $this->webhooks->resolveRecipients([(int) $actor->id])[0] ?? null;
