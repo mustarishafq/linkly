@@ -53,6 +53,7 @@ export default function NotificationSettings() {
   const [testingId, setTestingId] = useState("");
   const [error, setError] = useState("");
   const [webhooks, setWebhooks] = useState([]);
+  const [persistedWebhookIds, setPersistedWebhookIds] = useState(() => new Set());
 
   const loadSettings = async () => {
     setLoading(true);
@@ -63,6 +64,7 @@ export default function NotificationSettings() {
       const items = Array.isArray(config.webhooks) ? config.webhooks : [];
 
       setWebhooks(items.length > 0 ? items.map(normalizeWebhookFromApi) : [createEmptyWebhook()]);
+      setPersistedWebhookIds(new Set(items.map((webhook) => webhook.id).filter(Boolean)));
     } catch (err) {
       setError(err?.message || "Failed to load notification settings");
     } finally {
@@ -140,6 +142,12 @@ export default function NotificationSettings() {
     const webhook = webhooks[index];
     setTestingId(webhook.id);
     setError("");
+
+    if (!persistedWebhookIds.has(webhook.id)) {
+      setError("Save notification settings before sending a test.");
+      setTestingId("");
+      return;
+    }
 
     try {
       await db.settings.testEventWebhook(webhook.id);

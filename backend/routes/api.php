@@ -75,6 +75,7 @@ Route::middleware(JwtAuth::class)->group(function () {
 Route::middleware([JwtAuth::class, AdminRequired::class])->group(function () {
     Route::get('/settings', [SettingsController::class, 'show']);
     Route::patch('/settings', [SettingsController::class, 'update']);
+    Route::post('/settings/notifications/test', [SettingsController::class, 'testEventWebhook']);
     Route::post('/settings/event-webhook/test', [SettingsController::class, 'testEventWebhook']);
 
     Route::get('/admin/users', [AdminController::class, 'users']);

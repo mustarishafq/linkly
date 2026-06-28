@@ -27,17 +27,28 @@ function setToken(token) {
   }
 }
 
-function htmlApiMisconfigMessage() {
+function buildApiUrl(path) {
+  const base = String(API_BASE_URL).replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  return `${base}${normalizedPath}`;
+}
+
+function htmlApiMisconfigMessage(status, url) {
+  const statusLabel = status ? ` (HTTP ${status})` : "";
   return (
-    "API returned HTML instead of JSON. In production, set VITE_API_BASE_URL to your backend " +
-    "(e.g. https://linklyapi.emzinexus.com/api) and rebuild the frontend — not /api on the SPA host."
+    `API returned HTML instead of JSON${statusLabel} for ${url}. ` +
+    "In production, set VITE_API_BASE_URL to your backend " +
+    "(e.g. https://linklyapi.emzinexus.com/api) and rebuild the frontend — not /api on the SPA host. " +
+    "If other settings work, deploy the latest backend and try again."
   );
 }
 
 /**
  * @param {Response} response
+ * @param {string} url
  */
-async function readJsonResponse(response) {
+async function readJsonResponse(response, url) {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     return response.json();
@@ -46,13 +57,13 @@ async function readJsonResponse(response) {
   const text = await response.text();
   const trimmed = text.trimStart();
   if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
-    throw new Error(htmlApiMisconfigMessage());
+    throw new Error(htmlApiMisconfigMessage(response.status, url));
   }
 
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(`Unexpected response from API (${response.status})`);
+    throw new Error(`Unexpected response from API (${response.status}) at ${url}`);
   }
 }
 
@@ -64,12 +75,14 @@ async function request(path, options = {}) {
   const token = getToken();
   const headers = new Headers(options.headers || {});
   headers.set("Content-Type", "application/json");
+  headers.set("Accept", "application/json");
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const url = buildApiUrl(path);
+  const response = await fetch(url, {
     headers,
     ...options,
   });
@@ -77,9 +90,9 @@ async function request(path, options = {}) {
   if (!response.ok) {
     let payload = null;
     try {
-      payload = await readJsonResponse(response);
+      payload = await readJsonResponse(response, url);
     } catch (error) {
-      if (error instanceof Error && error.message === htmlApiMisconfigMessage()) {
+      if (error instanceof Error && error.message.includes("API returned HTML instead of JSON")) {
         throw error;
       }
       payload = null;
@@ -92,7 +105,7 @@ async function request(path, options = {}) {
     throw error;
   }
 
-  return readJsonResponse(response);
+  return readJsonResponse(response, url);
 }
 
 /**
@@ -102,12 +115,14 @@ async function request(path, options = {}) {
 async function uploadRequest(path, formData) {
   const token = getToken();
   const headers = new Headers();
+  headers.set("Accept", "application/json");
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const url = buildApiUrl(path);
+  const response = await fetch(url, {
     method: "POST",
     headers,
     body: formData,
@@ -116,9 +131,9 @@ async function uploadRequest(path, formData) {
   if (!response.ok) {
     let payload = null;
     try {
-      payload = await readJsonResponse(response);
+      payload = await readJsonResponse(response, url);
     } catch (error) {
-      if (error instanceof Error && error.message === htmlApiMisconfigMessage()) {
+      if (error instanceof Error && error.message.includes("API returned HTML instead of JSON")) {
         throw error;
       }
       payload = null;
@@ -131,7 +146,7 @@ async function uploadRequest(path, formData) {
     throw error;
   }
 
-  return readJsonResponse(response);
+  return readJsonResponse(response, url);
 }
 
 /** @param {string} entityName */
@@ -350,7 +365,7 @@ const settings = {
 
   /** @param {string} webhookId */
   async testEventWebhook(webhookId) {
-    return request("/settings/event-webhook/test", {
+    return request("/settings/notifications/test", {
       method: "POST",
       body: JSON.stringify({ webhook_id: webhookId }),
     });

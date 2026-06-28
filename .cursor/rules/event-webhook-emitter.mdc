@@ -32,7 +32,7 @@ Resolve `nexus_sso_id` from `users` table. Separate POST per distinct recipient.
 ## Config and admin (§2.1, §2.8)
 
 - Settings key `event_webhook.webhooks[]` — multiple UUID endpoints; secret auto-gen (`whsec_`), event toggles per webhook
-- Test path: `POST /api/settings/event-webhook/test` sends `webhook.test`
+- Test path: `POST /api/settings/notifications/test` (alias: `/api/settings/event-webhook/test`) sends `webhook.test`
 - `action_url` uses `FRONTEND_URL` / `config('linkly.frontend_url')`
 - Secrets redacted in API responses (`secret_set: true`)
 
@@ -51,4 +51,4 @@ Resolve `nexus_sso_id` from `users` table. Separate POST per distinct recipient.
 | Domain events | `backend/app/Services/LinkWebhookService.php` |
 | Event metadata | `backend/app/Support/EventWebhookMetadata.php` |
 | Admin UI | `frontend/src/components/settings/NotificationSettings.jsx` |
-| Test endpoint | `POST /api/settings/event-webhook/test` |
+| Test endpoint | `POST /api/settings/notifications/test` |
