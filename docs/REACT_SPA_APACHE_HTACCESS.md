@@ -104,7 +104,7 @@ npm run build
 
 Vite bakes `VITE_*` values into the JS bundle at build time — changing server env after deploy does nothing until you rebuild.
 
-For **local dev**, use `VITE_API_BASE_URL=/api` and `VITE_DEV_API_TARGET=http://127.0.0.1:8787` in the same file.
+For **local dev**, use `VITE_API_BASE_URL=/api` and `VITE_DEV_API_TARGET=http://127.0.0.1:8010` in the same file.
 
 ### Backend — CORS and app URLs
 

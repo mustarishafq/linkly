@@ -340,11 +340,19 @@ const settings = {
     return request("/settings/general-defaults");
   },
 
-  /** @param {{ general?: Record<string, unknown>, nexus_sso?: Record<string, unknown>, qr_default?: Record<string, unknown>, event_webhook?: Record<string, unknown> }} patch */
+  /** @param {{ general?: Record<string, unknown>, nexus_sso?: Record<string, unknown>, qr_default?: Record<string, unknown>, event_webhook?: Record<string, unknown>, mcp_api?: Record<string, unknown> }} patch */
   async update(patch) {
     return request("/settings", {
       method: "PATCH",
       body: JSON.stringify(patch || {}),
+    });
+  },
+
+  /** @param {string} webhookId */
+  async testEventWebhook(webhookId) {
+    return request("/settings/event-webhook/test", {
+      method: "POST",
+      body: JSON.stringify({ webhook_id: webhookId }),
     });
   },
 };

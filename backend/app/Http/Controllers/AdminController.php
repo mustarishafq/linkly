@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AuditLogService;
 use App\Services\JwtService;
+use App\Services\LinkWebhookService;
 use App\Support\SqlDate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,7 @@ class AdminController extends Controller
     public function __construct(
         private JwtService $jwt,
         private AuditLogService $audit,
+        private LinkWebhookService $linkWebhooks,
     ) {}
 
     public function users(): JsonResponse
@@ -37,10 +39,19 @@ class AdminController extends Controller
             return $this->error('not_found', 'User not found', 404);
         }
 
+        $wasApproved = (bool) $target->is_approved;
+
         DB::table('users')->where('id', $id)->update([
             'is_approved' => $isApproved,
             'updated_date' => SqlDate::now(),
         ]);
+
+        if ($isApproved && ! $wasApproved) {
+            $updatedUser = DB::table('users')->where('id', $id)->first();
+            if ($updatedUser) {
+                $this->linkWebhooks->userApproved($updatedUser);
+            }
+        }
 
         $actor = $request->attributes->get('auth_user');
         $this->audit->write([

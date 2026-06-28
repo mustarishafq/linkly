@@ -82,7 +82,7 @@ Phase 7 — Production (required — all systems)
 | Database | Platform-managed, often **UUID** PKs | **MySQL 8** you control |
 | Primary keys | UUID strings on entities & users | **`BIGINT UNSIGNED AUTO_INCREMENT`** (`$table->id()`) |
 | Auth | Platform session / tokens | **JWT** + optional [Nexus SSO](./nexus-sso-setup.md) |
-| Dev server | Single hosted dev URL | Vite `:5173` + Laravel `:8787` (or Herd) |
+| Dev server | Single hosted dev URL | Vite `:5180` + Laravel `:8010` (or Herd) |
 | Entity schemas | Export JSON schemas | JSON as **documentation**; data in MySQL tables |
 
 ### Linkly example (Base44 migration)
@@ -420,7 +420,7 @@ From [event-webhook-setup.md](./event-webhook-setup.md):
 | Settings API | `PATCH /api/settings` with `event_webhook` patch (admin) |
 | Delivery | `backend/app/Services/EventWebhookService.php` |
 
-> **Note:** Webhook config may use a UUID `id` in the portable spec ([event-webhook-setup.md §2.1](./event-webhook-setup.md#21-webhook-configuration-model)) for multi-webhook hubs. A **single** webhook in `settings` is valid for simpler apps — database **entity and user tables still use integer IDs**, not UUID primary keys.
+> **Note:** Webhook config uses a UUID `id` per endpoint ([event-webhook-setup.md §2.1](./event-webhook-setup.md#21-webhook-configuration-model)). Sentinel stores **multiple** webhooks in `settings.event_webhook.webhooks[]`. Database **entity and user tables still use integer IDs**, not UUID primary keys.
 
 ---
 
@@ -551,21 +551,11 @@ Foreign references in JSON payloads (`campaign_id`, etc.) should store **integer
 
 **Do not store structured domain data as JSON blobs** when the shape is known and relational. Use proper MySQL tables with typed columns and one-to-one or one-to-many relationships.
 
-| Pattern | When to use | Example |
-|---------|-------------|---------|
-| **One-to-one** | Single org-wide or per-parent record | `organization_qr_defaults` (one row, id `1`) |
-| **One-to-many** | Child records owned by a parent | `qr_designs.link_id` → short link |
-| **JSON `payload` in `entity_*`** | Legacy Base44 entities not yet normalized | `entity_shortlink`, `entity_campaign`, … |
-| **`settings` key-value JSON** | Small admin config blobs (SSO secrets, webhook toggles) | `nexus_sso`, `event_webhook` — not for first-class domain models |
-
-**QR code data (Linkly example — required pattern for this app):**
-
-| Table | Relationship | Service |
-|-------|--------------|---------|
-| `organization_qr_defaults` | One org default (singleton row) | `SettingsService::getQrDefaultConfig()` / `updateQrDefaultConfig()` |
-| `qr_designs` | Many designs per link (`link_id` BIGINT, `is_active`, `source`) | `QrDesignService` (API still exposed as `QRDesign` entity) |
-
-Migration: `backend/database/migrations/0001_01_01_000008_create_qr_design_tables.php` — creates tables and migrates legacy `settings.qr_default` JSON + `entity_qrdesign` payloads.
+| Pattern | When to use | Example (Sentinel) |
+|---------|-------------|---------------------|
+| **One-to-many** | Child records owned by a parent | `user_notifications.user_id` → user |
+| **JSON `payload` in `entity_*`** | Flexible entity records with typed service layer | `entity_domain`, `entity_alertsetting`, … |
+| **`settings` key-value JSON** | Small admin config blobs (SSO secrets, webhook toggles) | `nexus_sso`, `event_webhook`, `general` |
 
 When adding new features, prefer dedicated tables + services over stuffing fields into `settings.value` or `entity_*.payload`.
 
@@ -619,10 +609,10 @@ DB_USERNAME=root
 DB_PASSWORD=your_password
 
 JWT_SECRET=replace_with_a_long_random_secret_at_least_32_chars
-ADMIN_EMAIL=admin@{your-domain}.dev
-ADMIN_PASSWORD=admin12345
-APP_BASE_URL=http://localhost:5173
-FRONTEND_URL=http://localhost:5173
+ADMIN_EMAIL=admin@admin.com
+ADMIN_PASSWORD=password
+APP_BASE_URL=http://localhost:5180
+FRONTEND_URL=http://localhost:5180
 APP_TIMEZONE=UTC
 ```
 
@@ -636,7 +626,7 @@ Default local values:
 
 ```bash
 VITE_API_BASE_URL=/api
-VITE_DEV_API_TARGET=http://127.0.0.1:8787
+VITE_DEV_API_TARGET=http://127.0.0.1:8010
 VITE_APP_TIMEZONE=UTC
 ```
 
@@ -655,7 +645,7 @@ cd backend && php artisan storage:link && cd ..
 This creates all tables (integer PKs) and seeds:
 
 - Default settings (`SettingsSeeder`)
-- Admin user from `ADMIN_EMAIL` / `ADMIN_PASSWORD` (`AdminUserSeeder`)
+- Admin user (`AdminUserSeeder`): `admin@admin.com` / `password` by default (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD`)
 
 ### 6. Start development servers
 
@@ -665,10 +655,10 @@ npm run dev
 
 | Service | URL |
 |---------|-----|
-| Frontend | http://localhost:5173 |
-| Laravel API | http://127.0.0.1:8787 |
+| Frontend | http://localhost:5180 |
+| Laravel API | http://127.0.0.1:8010 |
 
-Sign in with the admin credentials from `backend/.env`.
+Sign in with `admin@admin.com` / `password` (or your `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `backend/.env`).
 
 ### 7. Optional — Laravel Herd (Linkly example)
 
@@ -680,9 +670,11 @@ VITE_DEV_API_TARGET=http://{app}.test
 
 ### Dev scripts (optional)
 
+See [DEV.md](./DEV.md) for full local development requirements.
+
 ```bash
 npm run dev:frontend   # Vite only
-npm run dev:api          # Laravel only (port 8787)
+npm run dev:api          # Laravel only (port 8010)
 npm run lint             # ESLint on frontend
 ```
 
@@ -736,8 +728,8 @@ Configure under **Settings** (`frontend/src/lib/settingsConfig.js`):
 |-----|---------|
 | **General** | Organization name, default domain, brand color (`BRAND_PRIMARY`), timezone |
 | **Security & SSO** | Nexus SSO secret, issuer, default role — [nexus-sso-setup.md](./nexus-sso-setup.md) |
-| **QR Codes** | Default QR styling for new links (stored in `organization_qr_defaults`, not `settings` JSON). Saves and user choices use confirmation dialogs. |
 | **Notifications** | Outbound event webhooks — [event-webhook-setup.md](./event-webhook-setup.md) |
+| **MCP API** | Nexus Brain connected system API key and rate limit |
 
 API: `GET` / `PATCH /api/settings` (admin JWT required). Secrets are redacted on read (`secret_set`, `api_key_set`).
 
@@ -819,7 +811,7 @@ Sensitive fields (passwords, tokens, secrets) are stripped before persistence.
 
 ## Verify the migration
 
-1. **Health** — `GET http://127.0.0.1:8787/api/health` returns JSON.
+1. **Health** — `GET http://127.0.0.1:8010/api/health` returns JSON.
 2. **Login** — Use admin email/password; token is stored in `localStorage` (Linkly: `linkly_access_token`; use a consistent key per app).
 3. **Entities** — Create a short link in the UI; confirm `entity_shortlink` row has numeric `id`.
 4. **No Base44** — `package.json` / `frontend/package.json` must not list `@base44/*`; grep the repo for `base44` should return nothing in application code.
@@ -962,6 +954,7 @@ For symptom → fix tables (404 on routes, HTML from API, CORS errors), see [REA
 - Set strong `JWT_SECRET`, disable `APP_DEBUG`, configure SMTP in `backend/.env`.
 - Run migrations on deploy: `cd backend && php artisan migrate --force`.
 - Run once per API deploy: `cd backend && php artisan storage:link` (serves uploaded logos at `/storage/...`).
+- **Cron for alert checks:** `* * * * * cd /path/to/backend && php artisan schedule:run >> /dev/null 2>&1` — runs daily `sentinel:check-alerts` (see [DEV.md](./DEV.md#automatic-alert-checks)).
 - Split domains: ensure CORS headers on `/storage/*` (repo `.htaccess` + Apache `mod_headers`, or Nginx `add_header`) — see [REACT_SPA_APACHE_HTACCESS.md](./REACT_SPA_APACHE_HTACCESS.md#uploaded-logos-and-storage-split-domains).
 
 ---

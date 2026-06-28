@@ -1,4 +1,4 @@
-import { Bell, QrCode, Settings2, ShieldCheck } from "lucide-react";
+import { Bell, Bot, QrCode, Settings2, ShieldCheck } from "lucide-react";
 
 export const SETTINGS_TABS = [
   {
@@ -24,6 +24,12 @@ export const SETTINGS_TABS = [
     label: "Notifications",
     description: "Outbound event webhooks",
     icon: Bell,
+  },
+  {
+    id: "mcp",
+    label: "MCP API",
+    description: "Nexus Brain Connected Systems",
+    icon: Bot,
   },
 ];
 
@@ -93,5 +99,13 @@ export const WEBHOOK_EVENT_OPTIONS = [
 ];
 
 export function buildDefaultWebhookEvents() {
-  return Object.fromEntries(WEBHOOK_EVENT_OPTIONS.map((event) => [event.id, false]));
+  return {
+    "link.created": true,
+    "link.updated": false,
+    "link.deleted": false,
+    "user.registered": true,
+    "user.approved": true,
+    "link.metric_threshold": true,
+    "webhook.test": true,
+  };
 }

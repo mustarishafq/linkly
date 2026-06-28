@@ -6,6 +6,7 @@ import PageHeader from "@/components/layout/PageHeader";
 import GeneralSettings from "@/components/settings/GeneralSettings";
 import NexusSsoSettings from "@/components/settings/NexusSsoSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
+import McpApiSettings from "@/components/settings/McpApiSettings";
 import QrDefaultSettings from "@/components/qr/QrDefaultSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -68,6 +69,9 @@ export default function Settings() {
           </TabsContent>
           <TabsContent value="notifications" className="mt-0 focus-visible:outline-none">
             <NotificationSettings />
+          </TabsContent>
+          <TabsContent value="mcp" className="mt-0 focus-visible:outline-none">
+            <McpApiSettings />
           </TabsContent>
         </div>
       </Tabs>

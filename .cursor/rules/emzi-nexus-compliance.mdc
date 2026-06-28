@@ -1,5 +1,5 @@
 ---
-description: Finish checklist — cleanup changes, verify EMZI Nexus docs, suggest improvements
+description: Before finishing changes, verify EMZI Nexus docs (UI, integrations, deploy)
 alwaysApply: true
 ---
 
@@ -11,6 +11,16 @@ When completing **any** task that touches UI, API, auth, integrations, or deploy
 
 - Index: `docs/README.md`
 - UI/UX: `docs/DESIGN_TEMPLATE.md` (pass §28 pre-ship for UI work)
+
+## Integration docs — read before finishing
+
+| If you touched… | Read this spec |
+|-----------------|----------------|
+| `*Webhook*`, `NotificationSettings`, `event_webhook`, notification triggers | `docs/event-webhook-setup.md` §2 + §4.1 |
+| SSO, `SsoController`, `NexusSsoSettings`, `nexus_sso_id` | `docs/nexus-sso-setup.md` |
+| `routes/api.php` under `mcp/v1`, MCP controllers | `docs/emzi-nexus-mcp-catalog-spec.md` |
+
+Also apply `.cursor/rules/event-webhook-emitter.mdc` when editing webhook-related files.
 
 ## Before marking complete
 
@@ -27,29 +37,33 @@ When completing **any** task that touches UI, API, auth, integrations, or deploy
 
 - [ ] Integer PKs on app tables — no UUID primary keys (`docs/INITIAL_SETUP.md`)
 - [ ] SSO changes match `docs/nexus-sso-setup.md`
-- [ ] Webhook changes match `docs/event-webhook-setup.md`
 - [ ] MCP routes under `/api/mcp/v1/` per `docs/emzi-nexus-mcp-catalog-spec.md`
+
+**Event webhooks (emitter)** — when changing delivery, settings, or notification triggers:
+
+Read `docs/event-webhook-setup.md` §2 and §4.1. Verify:
+
+- [ ] Config: multiple webhooks per installation; each with `id` (webhook_id), `url`, `secret` (`whsec_`, ≥32 chars), `enabled`, per-event `events` map
+- [ ] Payload top-level: `event`, `timestamp`, `webhook_id`, `type`, `category`, `title`, `body`, `action_url`, `nexus_sso_id` (not internal user IDs)
+- [ ] Nested object key = event domain prefix (`domain`, `alert`, `user`, …)
+- [ ] Recipients: resolve `users.nexus_sso_id`; one POST per distinct ID; dedupe; `null` if unlinked
+- [ ] HTTP: POST JSON, `X-Webhook-Secret`, `User-Agent: Sentinel-Webhooks/1.0`, 10s timeout, fire-and-forget (failures logged, never block main request)
+- [ ] `action_url` built from `FRONTEND_URL` / `config('sentinel.frontend_url')`
+- [ ] Test delivery: `webhook.test` via `POST /api/settings/event-webhook/test` + Settings → Notifications “Send test”
+- [ ] New events: `{domain}.{action}` naming, metadata (`type`/`category`), trigger wired, toggles in `WEBHOOK_EVENT_OPTIONS` + `SettingsService::EVENT_WEBHOOK_KEYS`
+
+**Sentinel webhook reference files:**
+
+- `backend/app/Services/EventWebhookService.php`
+- `backend/app/Services/LinkWebhookService.php`
+- `backend/app/Support/EventWebhookMetadata.php`
+- `backend/app/Services/SettingsService.php` (`event_webhook`)
+- `frontend/src/components/settings/NotificationSettings.jsx`
 
 **Deploy / env**:
 
 - [ ] Split domains: `VITE_API_BASE_URL` points to API host (`docs/REACT_SPA_APACHE_HTACCESS.md`)
 
-## Cleanup before marking complete
-
-Always tidy every change made in the session — do not leave partial or exploratory edits behind.
-
-- [ ] Remove debug code: `console.log`, `dd()`, `dump()`, temporary breakpoints, commented-out blocks
-- [ ] Delete unused imports, variables, functions, and files introduced during the task
-- [ ] Revert scratch/experimental edits that are not part of the delivered solution
-- [ ] Match surrounding style: naming, formatting, and patterns in touched files
-- [ ] Run linter on edited files; fix new issues introduced by the change
-- [ ] Confirm no secrets, `.env` values, or one-off test data were added to tracked files
-
-If cleanup reveals scope creep, trim the diff to what the task actually requires.
-
 ## Report format
 
-End every completed task with two short sections (skip **Compliance** for docs-only or unrelated changes):
-
-1. **Compliance** — what was verified against `docs/README.md` or what still needs manual QA
-2. **Improvements** — concrete, optional follow-ups spotted while working (refactors, tests, perf, UX, docs, tech debt). Keep actionable; do not block delivery on items outside the request
+If checks apply, end with a short **Compliance** note: what was verified or what still needs manual QA. Skip if the change was docs-only or unrelated (e.g. typo in a comment).

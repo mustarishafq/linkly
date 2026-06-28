@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AuditLogService;
+use App\Services\LinkWebhookService;
 use App\Services\SettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,18 +13,21 @@ class SettingsController extends Controller
     public function __construct(
         private SettingsService $settings,
         private AuditLogService $audit,
+        private LinkWebhookService $linkWebhooks,
     ) {}
 
     public function show(): JsonResponse
     {
         $nexusSso = $this->settings->getNexusSsoConfig();
         $eventWebhook = $this->settings->getEventWebhookConfig();
+        $mcpApi = $this->settings->getMcpApiConfig();
 
         return response()->json([
             'general' => $this->settings->getGeneralConfig(),
             'nexus_sso' => $this->settings->redactNexusSsoConfig($nexusSso),
             'qr_default' => $this->settings->getQrDefaultConfig(),
             'event_webhook' => $this->settings->redactEventWebhookConfig($eventWebhook),
+            'mcp_api' => $this->settings->redactMcpApiConfig($mcpApi),
         ]);
     }
 
@@ -190,26 +194,7 @@ class SettingsController extends Controller
                 return $this->error('invalid_event_webhook', $error->getMessage(), 400);
             }
 
-            $changedFields = [];
-            if (array_key_exists('enabled', $patch) && (bool) $before['enabled'] !== (bool) $after['enabled']) {
-                $changedFields[] = 'enabled';
-            }
-            if (array_key_exists('name', $patch) && $before['name'] !== $after['name']) {
-                $changedFields[] = 'name';
-            }
-            if (array_key_exists('url', $patch) && $before['url'] !== $after['url']) {
-                $changedFields[] = 'url';
-            }
-            if (array_key_exists('events', $patch)) {
-                foreach (SettingsService::EVENT_WEBHOOK_KEYS as $eventKey) {
-                    if (($before['events'][$eventKey] ?? false) !== ($after['events'][$eventKey] ?? false)) {
-                        $changedFields[] = "events.{$eventKey}";
-                    }
-                }
-            }
-            if (array_key_exists('secret', $patch) && strlen((string) ($patch['secret'] ?? '')) > 0) {
-                $changedFields[] = 'secret';
-            }
+            $changedFields = $this->diffEventWebhookConfig($before, $after);
 
             if ($changedFields) {
                 $user = request()->attributes->get('auth_user');
@@ -219,9 +204,7 @@ class SettingsController extends Controller
                     'details' => [
                         'scope' => 'event_webhook',
                         'changed_fields' => $changedFields,
-                        'enabled' => $after['enabled'],
-                        'url' => $after['url'],
-                        'secret_rotated' => in_array('secret', $changedFields, true),
+                        'webhook_count' => count($after['webhooks']),
                     ],
                 ]);
             }
@@ -229,10 +212,125 @@ class SettingsController extends Controller
             $response['event_webhook'] = $this->settings->redactEventWebhookConfig($after);
         }
 
+        if ($request->has('mcp_api')) {
+            $patch = $request->input('mcp_api');
+            if (! is_array($patch)) {
+                return $this->error('invalid_input', 'mcp_api object is required', 400);
+            }
+
+            $before = $this->settings->getMcpApiConfig();
+
+            try {
+                $after = $this->settings->updateMcpApiConfig($patch);
+            } catch (\InvalidArgumentException $error) {
+                return $this->error('invalid_mcp_api', $error->getMessage(), 400);
+            }
+
+            $changedFields = [];
+            if (array_key_exists('rate_limit', $patch) && (int) $before['rate_limit'] !== (int) $after['rate_limit']) {
+                $changedFields[] = 'rate_limit';
+            }
+            if (array_key_exists('api_key', $patch) && strlen((string) ($patch['api_key'] ?? '')) > 0) {
+                $changedFields[] = 'api_key';
+            }
+
+            if ($changedFields) {
+                $user = request()->attributes->get('auth_user');
+                $this->audit->write([
+                    'actor_user_id' => $user?->id,
+                    'action' => 'settings_updated',
+                    'details' => [
+                        'scope' => 'mcp_api',
+                        'changed_fields' => $changedFields,
+                        'rate_limit' => $after['rate_limit'],
+                        'api_key_rotated' => in_array('api_key', $changedFields, true),
+                    ],
+                ]);
+            }
+
+            $response['mcp_api'] = $this->settings->redactMcpApiConfig($after);
+        }
+
         if ($response === []) {
             return $this->error('invalid_input', 'No settings payload provided', 400);
         }
 
         return response()->json($response);
+    }
+
+    public function testEventWebhook(Request $request): JsonResponse
+    {
+        $webhookId = trim((string) $request->input('webhook_id', ''));
+
+        if ($webhookId === '') {
+            return $this->error('invalid_input', 'webhook_id is required', 400);
+        }
+
+        $webhook = $this->settings->findEventWebhookById($webhookId);
+
+        if (! $webhook) {
+            return $this->error('not_found', 'Webhook not found', 404);
+        }
+
+        if (! ($webhook['enabled'] ?? false)) {
+            return $this->error('webhook_disabled', 'Enable this webhook before sending a test', 400);
+        }
+
+        if (trim((string) ($webhook['url'] ?? '')) === '') {
+            return $this->error('invalid_webhook', 'Webhook URL is required', 400);
+        }
+
+        if (strlen($webhook['secret'] ?? '') < 32) {
+            return $this->error('invalid_webhook', 'Webhook secret is required', 400);
+        }
+
+        if (! ($webhook['events']['webhook.test'] ?? false)) {
+            return $this->error('event_disabled', 'Enable test events for this webhook first', 400);
+        }
+
+        $actor = $request->attributes->get('auth_user');
+        $delivered = $this->linkWebhooks->sendTest($webhook, $actor);
+
+        if (! $delivered) {
+            return $this->error('delivery_failed', 'Test webhook delivery failed. Check the URL and secret.', 502);
+        }
+
+        return response()->json(['ok' => true, 'message' => 'Test webhook sent']);
+    }
+
+    /** @return array<int, string> */
+    private function diffEventWebhookConfig(array $before, array $after): array
+    {
+        $changed = [];
+
+        if (count($before['webhooks'] ?? []) !== count($after['webhooks'] ?? [])) {
+            $changed[] = 'webhooks.count';
+        }
+
+        $beforeById = collect($before['webhooks'] ?? [])->keyBy('id');
+        foreach ($after['webhooks'] ?? [] as $webhook) {
+            $id = (string) $webhook['id'];
+            $previous = $beforeById->get($id);
+
+            if (! $previous) {
+                $changed[] = "webhooks.{$id}.created";
+
+                continue;
+            }
+
+            foreach (['name', 'url', 'enabled'] as $field) {
+                if (($previous[$field] ?? null) !== ($webhook[$field] ?? null)) {
+                    $changed[] = "webhooks.{$id}.{$field}";
+                }
+            }
+
+            foreach (SettingsService::EVENT_WEBHOOK_KEYS as $eventKey) {
+                if (($previous['events'][$eventKey] ?? false) !== ($webhook['events'][$eventKey] ?? false)) {
+                    $changed[] = "webhooks.{$id}.events.{$eventKey}";
+                }
+            }
+        }
+
+        return $changed;
     }
 }

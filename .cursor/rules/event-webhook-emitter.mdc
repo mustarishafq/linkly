@@ -1,0 +1,54 @@
+---
+description: Event webhook emitter must conform to docs/event-webhook-setup.md
+globs: backend/app/Services/*Webhook*.php,backend/app/Support/EventWebhookMetadata.php,backend/app/Http/Controllers/SettingsController.php,frontend/src/components/settings/NotificationSettings.jsx,frontend/src/lib/settingsConfig.js
+alwaysApply: false
+---
+
+# Event webhook emitter (Linkly)
+
+Before finishing, read `docs/event-webhook-setup.md` §2 (emitter) and §4.1 (checklist).
+
+This app is an **emitter** (not a receiver). Do not ship webhook changes unless all of the following hold.
+
+## Payload (§2.7)
+
+Every delivery includes:
+
+`event`, `timestamp`, `webhook_id`, `type`, `category`, `title`, `body`, `action_url`, `nexus_sso_id`, plus nested `{domain}` object where domain = first segment of `event` (e.g. `link.created` → `link: {…}`).
+
+**Forbidden:** `recipient_user_id`, generic `context` instead of nested domain object.
+
+## Delivery (§2.6)
+
+- POST + `Content-Type: application/json`
+- Headers: `X-Webhook-Secret`, `User-Agent: Linkly-Webhooks/1.0`
+- Timeout: 10 seconds
+- Non-blocking; log failures only — never roll back the primary business transaction
+
+## Recipients (§2.5)
+
+Resolve `nexus_sso_id` from `users` table. Separate POST per distinct recipient. Deduplicate same SSO ID. Send `nexus_sso_id: null` when no link exists.
+
+## Config and admin (§2.1, §2.8)
+
+- Settings key `event_webhook.webhooks[]` — multiple UUID endpoints; secret auto-gen (`whsec_`), event toggles per webhook
+- Test path: `POST /api/settings/event-webhook/test` sends `webhook.test`
+- `action_url` uses `FRONTEND_URL` / `config('linkly.frontend_url')`
+- Secrets redacted in API responses (`secret_set: true`)
+
+## New events (§5)
+
+1. Name: `{domain}.{action}`
+2. Add to `EventWebhookMetadata`, `SettingsService::EVENT_WEBHOOK_KEYS`, `WEBHOOK_EVENT_OPTIONS`
+3. Wire trigger in `LinkWebhookService` (or domain service)
+4. Update `docs/event-webhook-setup.md` Appendix A if reference implementation changes
+
+## Reference implementation
+
+| Piece | Location |
+|-------|----------|
+| Delivery | `backend/app/Services/EventWebhookService.php` |
+| Domain events | `backend/app/Services/LinkWebhookService.php` |
+| Event metadata | `backend/app/Support/EventWebhookMetadata.php` |
+| Admin UI | `frontend/src/components/settings/NotificationSettings.jsx` |
+| Test endpoint | `POST /api/settings/event-webhook/test` |

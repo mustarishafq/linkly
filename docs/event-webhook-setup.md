@@ -429,13 +429,29 @@ To add events from another satellite app (e.g. complaints, leave, assets):
 
 Booking is the reference emitter for the `booking.*` event family.
 
+### EMZI Nexus Sentinel (`domain.*`, `alert.*`, `user.*`)
+
+| Spec area | Implementation |
+|-----------|----------------|
+| Webhook delivery | `backend/app/Services/EventWebhookService.php` (fire-and-forget POST) |
+| Domain events | `backend/app/Services/SentinelWebhookService.php` |
+| Admin configuration | Settings → Notifications (`NotificationSettings.jsx`) |
+| Default events | `domain.created`, `domain.updated`, `domain.deleted`, `alert.triggered`, `user.registered`, `user.approved`, `webhook.test` |
+| Config storage | `settings.event_webhook.webhooks[]` — multiple UUID endpoints per §2.1 |
+| Test delivery | `POST /api/settings/event-webhook/test` (admin) |
+
+Sentinel is the reference emitter for the `domain.*` and `alert.*` event families.
+
 ### Linkly (`link.*`, `user.*`)
 
 | Spec area | Implementation |
 |-----------|----------------|
 | Webhook delivery | `backend/app/Services/EventWebhookService.php` (fire-and-forget POST) |
+| Domain events | `backend/app/Services/LinkWebhookService.php` |
+| Event metadata | `backend/app/Support/EventWebhookMetadata.php` |
 | Admin configuration | Settings → Notifications (`NotificationSettings.jsx`) |
-| Default events | `link.created`, `user.registered`, `user.approved`, `link.metric_threshold`, `webhook.test` |
-| Config storage | Single `event_webhook` row in `settings` (simpler than multi-webhook UUID model) |
+| Default events | `link.created`, `link.updated`, `link.deleted`, `user.registered`, `user.approved`, `link.metric_threshold`, `webhook.test` |
+| Config storage | `settings.event_webhook.webhooks[]` — multiple UUID endpoints per §2.1 |
+| Test delivery | `POST /api/settings/event-webhook/test` (admin) |
 
 Other EMZI apps SHOULD conform to this document and may cite Booking or Linkly as worked examples.

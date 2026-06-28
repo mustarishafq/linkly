@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AuditLogService;
 use App\Services\JwtService;
+use App\Services\LinkWebhookService;
 use App\Support\IdGenerator;
 use App\Support\SqlDate;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ class AuthController extends Controller
     public function __construct(
         private JwtService $jwt,
         private AuditLogService $audit,
+        private LinkWebhookService $linkWebhooks,
     ) {}
 
     public function register(Request $request): JsonResponse
@@ -50,6 +52,11 @@ class AuthController extends Controller
             'target_user_id' => $id,
             'details' => ['email' => $email, 'full_name' => $fullName],
         ]);
+
+        $user = DB::table('users')->where('id', $id)->first();
+        if ($user) {
+            $this->linkWebhooks->userRegistered($user);
+        }
 
         return response()->json([
             'message' => 'Registration successful. Please wait for admin approval before login.',

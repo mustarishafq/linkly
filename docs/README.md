@@ -4,7 +4,7 @@ Portable specs and setup guides for **EMZI Nexus Brain** and **every satellite a
 
 **Linkly** in this repository is one reference implementation. Replace placeholders `{app}`, `{spa-domain}`, `{api-domain}`, and `{db_name}` with your project values.
 
-For day-to-day dev commands, see the root [README.md](../README.md).
+For day-to-day dev commands, see [DEV.md](./DEV.md) and the root [README.md](../README.md).
 
 ---
 
@@ -32,6 +32,7 @@ Skip sections in **INITIAL_SETUP** marked **Linkly example** when starting green
 
 | Document | What it defines |
 |----------|-----------------|
+| [DEV.md](./DEV.md) | Local dev: `npm run dev`, env vars, ports, Herd, troubleshooting |
 | [INITIAL_SETUP.md](./INITIAL_SETUP.md) | Monorepo layout, Laravel + React setup, migration phases, database rules (integer PKs), post-install admin |
 | [DESIGN_TEMPLATE.md](./DESIGN_TEMPLATE.md) | **Single source of truth** for UI: tokens, shadcn/ui, layout, auth pages, overlays, forms, confirms, back navigation, dark mode |
 | [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) | Glass dock: sizing, glass tokens, mobile orb, safe area, active indicator (routes are per-app) |
@@ -95,33 +96,6 @@ When implementing a feature, match the **portable spec** first, then compare aga
 | `{api-domain}` | Public API URL (e.g. `api.links.example.com`) |
 | `{nexus-brain-domain}` | Nexus Brain origin (e.g. `emzinexus.com`) |
 | `{db_name}` | MySQL database name |
-
----
-
-## Finish checklist (PR / agent)
-
-Before marking work complete — whether you ship a PR or use Cursor — run through this list. Cursor agents follow the same rules in [`.cursor/rules/emzi-nexus-compliance.mdc`](../.cursor/rules/emzi-nexus-compliance.mdc).
-
-### Cleanup
-
-Tidy every change; do not leave partial or exploratory edits in the diff.
-
-- Remove debug code (`console.log`, `dd()`, `dump()`, commented-out blocks)
-- Delete unused imports, variables, functions, and files introduced for the task
-- Revert scratch edits that are not part of the delivered solution
-- Match naming, formatting, and patterns in touched files
-- Run the linter on edited files; fix new issues you introduced
-- Confirm no secrets, `.env` values, or one-off test data were added to tracked files
-
-If cleanup reveals scope creep, trim the diff to what the task actually requires.
-
-### Compliance
-
-Verify against the **Consistency rules** table above and the linked spec for your change area (UI → DESIGN_TEMPLATE §28; integrations → the matching setup doc).
-
-### Improvements (optional note)
-
-In the PR description or agent summary, add a short **Improvements** list: concrete follow-ups you noticed (refactors, tests, perf, UX, docs, tech debt). Keep items actionable; they should not block shipping the current change.
 
 ---
 

@@ -15,7 +15,7 @@ class LinkNotificationService
 
     public function __construct(
         private EntityService $entities,
-        private EventWebhookService $webhooks,
+        private LinkWebhookService $linkWebhooks,
         private InAppNotificationService $inApp,
     ) {}
 
@@ -205,12 +205,15 @@ class LinkNotificationService
 
         $this->inApp->dispatch('link.metric_threshold', $subscribers, $title, $body, $context);
 
-        $this->webhooks->dispatch(
-            'link.metric_threshold',
+        $this->linkWebhooks->linkMetricThreshold(
+            $link,
+            $rule,
             $subscribers,
             $title,
             $body,
-            $context
+            $metrics,
+            $metricValue,
+            $metricKey,
         );
     }
 

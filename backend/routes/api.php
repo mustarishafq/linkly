@@ -10,8 +10,17 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SsoController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\Mcp\McpAuditLogController;
+use App\Http\Controllers\Mcp\McpCampaignController;
+use App\Http\Controllers\Mcp\McpCatalogController;
+use App\Http\Controllers\Mcp\McpDomainController;
+use App\Http\Controllers\Mcp\McpLinkController;
+use App\Http\Controllers\Mcp\McpUserController;
 use App\Http\Middleware\AdminRequired;
+use App\Http\Middleware\AuthenticateMcpClient;
 use App\Http\Middleware\JwtAuth;
+use App\Http\Middleware\LogMcpRequest;
+use App\Http\Middleware\McpRateLimit;
 use App\Http\Middleware\OptionalJwtAuth;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +37,29 @@ Route::prefix('auth')->group(function () {
 
 Route::post('/sso/nexus/verify', [SsoController::class, 'verifyNexus']);
 
+Route::prefix('mcp/v1')->middleware([
+    LogMcpRequest::class,
+    AuthenticateMcpClient::class,
+    McpRateLimit::class,
+])->group(function () {
+    Route::get('/catalog', [McpCatalogController::class, 'index']);
+
+    Route::get('/links', [McpLinkController::class, 'index']);
+    Route::post('/links', [McpLinkController::class, 'store']);
+    Route::get('/links/{id}', [McpLinkController::class, 'show']);
+    Route::patch('/links/{id}', [McpLinkController::class, 'update']);
+    Route::delete('/links/{id}', [McpLinkController::class, 'destroy']);
+
+    Route::get('/campaigns', [McpCampaignController::class, 'index']);
+    Route::get('/campaigns/{id}', [McpCampaignController::class, 'show']);
+
+    Route::get('/domains', [McpDomainController::class, 'index']);
+    Route::get('/domains/{id}', [McpDomainController::class, 'show']);
+
+    Route::get('/users', [McpUserController::class, 'index']);
+    Route::get('/audit-logs', [McpAuditLogController::class, 'index']);
+});
+
 Route::middleware(JwtAuth::class)->group(function () {
     Route::get('/users/directory', [AuthController::class, 'userDirectory']);
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -43,6 +75,7 @@ Route::middleware(JwtAuth::class)->group(function () {
 Route::middleware([JwtAuth::class, AdminRequired::class])->group(function () {
     Route::get('/settings', [SettingsController::class, 'show']);
     Route::patch('/settings', [SettingsController::class, 'update']);
+    Route::post('/settings/event-webhook/test', [SettingsController::class, 'testEventWebhook']);
 
     Route::get('/admin/users', [AdminController::class, 'users']);
     Route::patch('/admin/users/{id}/approval', [AdminController::class, 'updateApproval']);

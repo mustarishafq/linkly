@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Support\SqlDate;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SettingsService
 {
@@ -33,20 +34,23 @@ class SettingsService
         'timezone' => 'UTC',
     ];
 
+    private const DEFAULT_WEBHOOK_EVENTS = [
+        'link.created' => true,
+        'link.updated' => false,
+        'link.deleted' => false,
+        'user.registered' => true,
+        'user.approved' => true,
+        'link.metric_threshold' => true,
+        'webhook.test' => true,
+    ];
+
     private const DEFAULT_EVENT_WEBHOOK = [
-        'enabled' => false,
-        'name' => 'Nexus Brain',
-        'url' => '',
-        'secret' => '',
-        'events' => [
-            'link.created' => true,
-            'link.updated' => false,
-            'link.deleted' => false,
-            'user.registered' => true,
-            'user.approved' => true,
-            'link.metric_threshold' => true,
-            'webhook.test' => true,
-        ],
+        'webhooks' => [],
+    ];
+
+    private const DEFAULT_MCP_API = [
+        'api_key' => '',
+        'rate_limit' => 60,
     ];
 
     public const EVENT_WEBHOOK_KEYS = [
@@ -93,6 +97,14 @@ class SettingsService
             DB::table('settings')->insert([
                 'key' => 'event_webhook',
                 'value' => json_encode(self::DEFAULT_EVENT_WEBHOOK),
+                'updated_date' => SqlDate::now(),
+            ]);
+        }
+
+        if (! DB::table('settings')->where('key', 'mcp_api')->exists()) {
+            DB::table('settings')->insert([
+                'key' => 'mcp_api',
+                'value' => json_encode(self::DEFAULT_MCP_API),
                 'updated_date' => SqlDate::now(),
             ]);
         }
@@ -256,58 +268,127 @@ class SettingsService
     public function redactEventWebhookConfig(array $config): array
     {
         return [
-            'enabled' => (bool) ($config['enabled'] ?? false),
-            'name' => trim((string) ($config['name'] ?? self::DEFAULT_EVENT_WEBHOOK['name'])),
-            'url' => trim((string) ($config['url'] ?? '')),
-            'secret_set' => strlen($config['secret'] ?? '') >= 32,
-            'events' => $this->normalizeEventWebhookEvents($config['events'] ?? []),
+            'webhooks' => array_map(
+                fn (array $webhook) => $this->redactWebhookRecord($webhook),
+                $config['webhooks'] ?? []
+            ),
         ];
     }
 
     public function updateEventWebhookConfig(array $patch): array
     {
         $current = $this->getEventWebhookConfig();
+
+        if (! array_key_exists('webhooks', $patch)) {
+            throw new \InvalidArgumentException('webhooks array is required');
+        }
+
+        if (! is_array($patch['webhooks'])) {
+            throw new \InvalidArgumentException('webhooks must be an array');
+        }
+
+        $existingById = [];
+        foreach ($current['webhooks'] as $webhook) {
+            $existingById[(string) $webhook['id']] = $webhook;
+        }
+
+        $nextWebhooks = [];
+        foreach ($patch['webhooks'] as $webhookPatch) {
+            if (! is_array($webhookPatch)) {
+                throw new \InvalidArgumentException('Each webhook must be an object');
+            }
+
+            $id = trim((string) ($webhookPatch['id'] ?? ''));
+            $existing = $id !== '' ? ($existingById[$id] ?? null) : null;
+
+            $nextWebhooks[] = $this->normalizeWebhookRecord($webhookPatch, $existing);
+        }
+
+        $next = ['webhooks' => $nextWebhooks];
+        $this->validateEventWebhookConfig($next);
+        $this->upsertSetting('event_webhook', $next);
+
+        return $next;
+    }
+
+    public function findEventWebhookById(string $webhookId): ?array
+    {
+        foreach ($this->getEventWebhookConfig()['webhooks'] as $webhook) {
+            if ((string) $webhook['id'] === $webhookId) {
+                return $webhook;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param  array<int, int|string>  $userIds @return array<int, string|null> */
+    public function resolveNexusSsoIds(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('users')
+            ->whereIn('id', $userIds)
+            ->select('id', 'nexus_sso_id')
+            ->get()
+            ->keyBy(fn ($row) => (int) $row->id);
+
+        return array_map(
+            fn ($userId) => isset($rows[(int) $userId]) && $rows[(int) $userId]->nexus_sso_id
+                ? (string) $rows[(int) $userId]->nexus_sso_id
+                : null,
+            $userIds
+        );
+    }
+
+    public static function generateWebhookSecret(): string
+    {
+        return 'whsec_'.bin2hex(random_bytes(32));
+    }
+
+    public function getMcpApiConfig(): array
+    {
+        $row = DB::table('settings')->where('key', 'mcp_api')->first();
+
+        if (! $row) {
+            return self::DEFAULT_MCP_API;
+        }
+
+        $value = is_string($row->value) ? json_decode($row->value, true) : (array) $row->value;
+
+        return $this->normalizeMcpApiConfig($value);
+    }
+
+    public function redactMcpApiConfig(array $config): array
+    {
+        return [
+            'api_key_set' => strlen($config['api_key'] ?? '') >= 32,
+            'rate_limit' => max(1, (int) ($config['rate_limit'] ?? 60)),
+        ];
+    }
+
+    public function updateMcpApiConfig(array $patch): array
+    {
+        $current = $this->getMcpApiConfig();
         $next = $current;
 
-        if (array_key_exists('enabled', $patch)) {
-            $next['enabled'] = (bool) $patch['enabled'];
-        }
-
-        if (array_key_exists('name', $patch)) {
-            $next['name'] = trim((string) ($patch['name'] ?? '')) ?: self::DEFAULT_EVENT_WEBHOOK['name'];
-        }
-
-        if (array_key_exists('url', $patch)) {
-            $next['url'] = trim((string) ($patch['url'] ?? ''));
-        }
-
-        if (array_key_exists('events', $patch)) {
-            if (! is_array($patch['events'])) {
-                throw new \InvalidArgumentException('events must be an object');
-            }
-            $next['events'] = $this->normalizeEventWebhookEvents($patch['events']);
-        }
-
-        if (array_key_exists('secret', $patch)) {
-            $incoming = (string) ($patch['secret'] ?? '');
+        if (array_key_exists('api_key', $patch)) {
+            $incoming = (string) ($patch['api_key'] ?? '');
             if ($incoming !== '') {
                 if (strlen($incoming) < 32) {
-                    throw new \InvalidArgumentException('Secret must be at least 32 characters');
+                    throw new \InvalidArgumentException('api_key must be at least 32 characters');
                 }
-                $next['secret'] = $incoming;
+                $next['api_key'] = $incoming;
             }
         }
 
-        if ($next['enabled']) {
-            if ($next['url'] === '' || ! filter_var($next['url'], FILTER_VALIDATE_URL)) {
-                throw new \InvalidArgumentException('A valid webhook URL is required when notifications are enabled');
-            }
-            if (strlen($next['secret'] ?? '') < 32) {
-                throw new \InvalidArgumentException('A webhook secret of at least 32 characters is required when notifications are enabled');
-            }
+        if (array_key_exists('rate_limit', $patch)) {
+            $next['rate_limit'] = max(1, (int) $patch['rate_limit']);
         }
 
-        $this->upsertSetting('event_webhook', $next);
+        $this->upsertSetting('mcp_api', $next);
 
         return $next;
     }
@@ -439,18 +520,100 @@ class SettingsService
 
     private function normalizeEventWebhookConfig(array $value): array
     {
+        if (isset($value['webhooks']) && is_array($value['webhooks'])) {
+            return [
+                'webhooks' => array_values(array_map(
+                    fn (array $webhook) => $this->normalizeWebhookRecord($webhook),
+                    $value['webhooks']
+                )),
+            ];
+        }
+
+        if (isset($value['url']) || isset($value['enabled']) || isset($value['name'])) {
+            return [
+                'webhooks' => [
+                    $this->normalizeWebhookRecord([
+                        'id' => (string) Str::uuid(),
+                        'name' => $value['name'] ?? 'Nexus Brain',
+                        'url' => $value['url'] ?? '',
+                        'secret' => $value['secret'] ?? '',
+                        'enabled' => $value['enabled'] ?? false,
+                        'events' => $value['events'] ?? [],
+                    ]),
+                ],
+            ];
+        }
+
+        return self::DEFAULT_EVENT_WEBHOOK;
+    }
+
+    /** @param  array<string, mixed>  $patch @param  array<string, mixed>|null  $existing */
+    private function normalizeWebhookRecord(array $patch, ?array $existing = null): array
+    {
+        $id = trim((string) ($patch['id'] ?? $existing['id'] ?? ''));
+        if ($id === '') {
+            $id = (string) Str::uuid();
+        }
+
+        $secret = (string) ($existing['secret'] ?? '');
+        if (array_key_exists('secret', $patch)) {
+            $incoming = (string) ($patch['secret'] ?? '');
+            if ($incoming !== '') {
+                if (strlen($incoming) < 32) {
+                    throw new \InvalidArgumentException('Secret must be at least 32 characters');
+                }
+                $secret = $incoming;
+            }
+        }
+
+        if ($secret === '' && ($patch['enabled'] ?? $existing['enabled'] ?? false)) {
+            $secret = self::generateWebhookSecret();
+        }
+
         return [
-            'enabled' => (bool) ($value['enabled'] ?? false),
-            'name' => trim((string) ($value['name'] ?? '')) ?: self::DEFAULT_EVENT_WEBHOOK['name'],
-            'url' => trim((string) ($value['url'] ?? '')),
-            'secret' => (string) ($value['secret'] ?? ''),
-            'events' => $this->normalizeEventWebhookEvents($value['events'] ?? []),
+            'id' => $id,
+            'name' => trim((string) ($patch['name'] ?? $existing['name'] ?? '')) ?: 'Nexus Brain',
+            'url' => trim((string) ($patch['url'] ?? $existing['url'] ?? '')),
+            'secret' => $secret,
+            'enabled' => (bool) ($patch['enabled'] ?? $existing['enabled'] ?? false),
+            'events' => $this->normalizeEventWebhookEvents($patch['events'] ?? $existing['events'] ?? []),
         ];
+    }
+
+    /** @param  array<string, mixed>  $webhook */
+    private function redactWebhookRecord(array $webhook): array
+    {
+        return [
+            'id' => (string) $webhook['id'],
+            'name' => trim((string) ($webhook['name'] ?? 'Nexus Brain')),
+            'url' => trim((string) ($webhook['url'] ?? '')),
+            'secret_set' => strlen($webhook['secret'] ?? '') >= 32,
+            'enabled' => (bool) ($webhook['enabled'] ?? false),
+            'events' => $this->normalizeEventWebhookEvents($webhook['events'] ?? []),
+        ];
+    }
+
+    private function validateEventWebhookConfig(array $config): void
+    {
+        foreach ($config['webhooks'] as $webhook) {
+            if (! ($webhook['enabled'] ?? false)) {
+                continue;
+            }
+
+            $url = trim((string) ($webhook['url'] ?? ''));
+            if ($url === '' || ! filter_var($url, FILTER_VALIDATE_URL)) {
+                throw new \InvalidArgumentException('A valid webhook URL is required for each enabled webhook');
+            }
+
+            if (strlen($webhook['secret'] ?? '') < 32) {
+                throw new \InvalidArgumentException('A webhook secret of at least 32 characters is required for each enabled webhook');
+            }
+        }
     }
 
     private function normalizeEventWebhookEvents(array $events): array
     {
-        $normalized = self::DEFAULT_EVENT_WEBHOOK['events'];
+        $normalized = self::DEFAULT_WEBHOOK_EVENTS;
 
         foreach (self::EVENT_WEBHOOK_KEYS as $key) {
             if (array_key_exists($key, $events)) {
@@ -459,6 +622,14 @@ class SettingsService
         }
 
         return $normalized;
+    }
+
+    private function normalizeMcpApiConfig(array $value): array
+    {
+        return [
+            'api_key' => (string) ($value['api_key'] ?? ''),
+            'rate_limit' => max(1, (int) ($value['rate_limit'] ?? self::DEFAULT_MCP_API['rate_limit'])),
+        ];
     }
 
     private function upsertSetting(string $key, array $value): void

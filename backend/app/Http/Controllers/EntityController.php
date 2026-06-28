@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\EntityService;
 use App\Services\LinkNotificationService;
+use App\Services\LinkWebhookService;
 use App\Services\QrDesignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,7 @@ class EntityController extends Controller
     public function __construct(
         private EntityService $entities,
         private LinkNotificationService $linkNotifications,
+        private LinkWebhookService $linkWebhooks,
         private QrDesignService $qrDesigns,
     ) {}
 
@@ -104,6 +106,10 @@ class EntityController extends Controller
             $this->linkNotifications->evaluateForLink((int) $record['link_id']);
         }
 
+        if ($entity === 'ShortLink') {
+            $this->linkWebhooks->linkCreated($record, $user?->id);
+        }
+
         return response()->json($record);
     }
 
@@ -164,6 +170,10 @@ class EntityController extends Controller
         $user = $request->attributes->get('auth_user');
         $updated = $this->entities->update($table, $entity, $id, $request->all(), $user?->id);
 
+        if ($entity === 'ShortLink' && $updated) {
+            $this->linkWebhooks->linkUpdated($updated, $user?->id);
+        }
+
         return response()->json($updated);
     }
 
@@ -182,7 +192,12 @@ class EntityController extends Controller
         }
 
         $user = $request->attributes->get('auth_user');
+        $existing = $entity === 'ShortLink' ? $this->entities->find($table, $id) : null;
         $deleted = $this->entities->delete($table, $entity, $id, $user?->id);
+
+        if ($entity === 'ShortLink' && $existing) {
+            $this->linkWebhooks->linkDeleted($existing, $user?->id);
+        }
 
         return response()->json($deleted);
     }
