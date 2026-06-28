@@ -6,18 +6,21 @@ use Illuminate\Support\Facades\DB;
 
 class LinkWebhookService
 {
-    public function __construct(private EventWebhookService $webhooks) {}
+    public function __construct(
+        private EventWebhookService $webhooks,
+        private InAppNotificationService $inApp,
+    ) {}
 
     /** @param  array<string, mixed>  $link */
     public function linkCreated(array $link, int|string|null $ownerUserId): void
     {
         $label = $this->linkLabel($link);
-        $this->webhooks->dispatch(
+        $this->dispatchLinkEvent(
             'link.created',
-            $ownerUserId ? [(int) $ownerUserId] : [],
+            $link,
+            $ownerUserId,
             'New link created',
             "Short link \"{$label}\" was created.",
-            $this->linkSnapshot($link),
             '/links/'.($link['id'] ?? ''),
         );
     }
@@ -26,12 +29,12 @@ class LinkWebhookService
     public function linkUpdated(array $link, int|string|null $ownerUserId): void
     {
         $label = $this->linkLabel($link);
-        $this->webhooks->dispatch(
+        $this->dispatchLinkEvent(
             'link.updated',
-            $ownerUserId ? [(int) $ownerUserId] : [],
+            $link,
+            $ownerUserId,
             'Link updated',
             "Short link \"{$label}\" was updated.",
-            $this->linkSnapshot($link),
             '/links/'.($link['id'] ?? ''),
         );
     }
@@ -40,12 +43,12 @@ class LinkWebhookService
     public function linkDeleted(array $link, int|string|null $ownerUserId): void
     {
         $label = $this->linkLabel($link);
-        $this->webhooks->dispatch(
+        $this->dispatchLinkEvent(
             'link.deleted',
-            $ownerUserId ? [(int) $ownerUserId] : [],
+            $link,
+            $ownerUserId,
             'Link deleted',
             "Short link \"{$label}\" was removed.",
-            $this->linkSnapshot($link),
             '/links',
         );
     }
@@ -59,12 +62,21 @@ class LinkWebhookService
             ->all();
 
         $name = trim((string) ($user->full_name ?? '')) ?: (string) ($user->email ?? 'A user');
+        $title = 'New user registration';
+        $body = "{$name} registered and is awaiting approval.";
+        $snapshot = $this->userSnapshot($user);
+        $context = ['user' => $snapshot];
+
+        if ($adminIds !== []) {
+            $this->inApp->dispatch('user.registered', $adminIds, $title, $body, $context);
+        }
+
         $this->webhooks->dispatch(
             'user.registered',
             $adminIds,
-            'New user registration',
-            "{$name} registered and is awaiting approval.",
-            $this->userSnapshot($user),
+            $title,
+            $body,
+            $snapshot,
             '/admin/users',
         );
     }
@@ -72,12 +84,19 @@ class LinkWebhookService
     public function userApproved(object $user): void
     {
         $name = trim((string) ($user->full_name ?? '')) ?: (string) ($user->email ?? 'Your account');
+        $title = 'Account approved';
+        $body = "{$name}'s account has been approved.";
+        $snapshot = $this->userSnapshot($user);
+        $context = ['user' => $snapshot];
+
+        $this->inApp->dispatch('user.approved', [(int) $user->id], $title, $body, $context);
+
         $this->webhooks->dispatch(
             'user.approved',
             [(int) $user->id],
-            'Account approved',
-            "{$name}'s account has been approved.",
-            $this->userSnapshot($user),
+            $title,
+            $body,
+            $snapshot,
             '/dashboard',
         );
     }
@@ -148,6 +167,44 @@ class LinkWebhookService
         ];
 
         return $this->webhooks->sendTestPayload($webhook, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $link
+     * @param  array<int, int|string>  $recipientUserIds
+     */
+    private function dispatchLinkEvent(
+        string $event,
+        array $link,
+        int|string|null $ownerUserId,
+        string $title,
+        string $body,
+        string $actionPath,
+    ): void {
+        $snapshot = $this->linkSnapshot($link);
+        $recipients = $this->normalizeRecipientIds($ownerUserId ? [$ownerUserId] : []);
+        $context = [
+            'link' => [
+                'id' => $link['id'] ?? null,
+                'slug' => $link['slug'] ?? null,
+                'title' => $link['title'] ?? null,
+            ],
+        ];
+
+        if ($recipients !== []) {
+            $this->inApp->dispatch($event, $recipients, $title, $body, $context);
+        }
+
+        $this->webhooks->dispatch($event, $recipients, $title, $body, $snapshot, $actionPath);
+    }
+
+    /** @param  array<int, int|string|null>  $ids @return array<int, int> */
+    private function normalizeRecipientIds(array $ids): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map(fn ($id) => is_numeric($id) ? (int) $id : null, $ids),
+            fn ($id) => $id !== null && $id > 0,
+        )));
     }
 
     /** @param  array<string, mixed>  $link */

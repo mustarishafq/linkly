@@ -159,7 +159,7 @@ class LinkNotificationService
     ): void {
         $subscribers = array_values(array_filter(
             (array) ($rule['subscriber_user_ids'] ?? []),
-            fn ($id) => is_string($id) && $id !== ''
+            fn ($id) => $id !== null && $id !== '' && is_numeric($id),
         ));
 
         if ($subscribers === []) {

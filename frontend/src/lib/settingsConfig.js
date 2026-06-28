@@ -101,8 +101,8 @@ export const WEBHOOK_EVENT_OPTIONS = [
 export function buildDefaultWebhookEvents() {
   return {
     "link.created": true,
-    "link.updated": false,
-    "link.deleted": false,
+    "link.updated": true,
+    "link.deleted": true,
     "user.registered": true,
     "user.approved": true,
     "link.metric_threshold": true,
