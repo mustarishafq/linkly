@@ -23,6 +23,7 @@ import {
   ChevronDown,
   FlaskConical,
   Trophy,
+  Palette,
 } from "lucide-react";
 import { getShortUrl } from "@/lib/qrcode";
 import { getTestLinkUrl, filterOfficialClicks } from "@/lib/linkPreview";
@@ -37,7 +38,7 @@ import DeviceChart from "@/components/dashboard/DeviceChart";
 import WeekSummary from "@/components/dashboard/WeekSummary";
 import SourceBreakdown from "@/components/dashboard/SourceBreakdown";
 import LinkRecentActivity from "@/components/dashboard/LinkRecentActivity";
-import QRDesignManager from "@/components/qr/QRDesignManager";
+import QRDesignDialog from "@/components/qr/QRDesignDialog";
 import LinkFormDialog from "@/components/links/LinkFormDialog";
 import LinkFavicon from "@/components/links/LinkFavicon";
 import LinkNotificationManager from "@/components/links/LinkNotificationManager";
@@ -288,6 +289,7 @@ export default function LinkDetail() {
   const [copied, setCopied] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [showQrDesigns, setShowQrDesigns] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -510,7 +512,7 @@ export default function LinkDetail() {
               )}
             </p>
           </div>
-          <div className="grid grid-cols-5 gap-1.5 w-full sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:w-auto shrink-0">
+          <div className="grid grid-cols-3 gap-1.5 w-full sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:w-auto shrink-0">
             <Button
               variant="outline"
               size="sm"
@@ -547,6 +549,16 @@ export default function LinkDetail() {
             >
               <QrCode className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">QR</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full px-0 sm:w-auto sm:px-3"
+              onClick={() => setShowQrDesigns(true)}
+              aria-label="Manage QR designs"
+            >
+              <Palette className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Designs</span>
             </Button>
             <Button
               variant="outline"
@@ -713,14 +725,6 @@ export default function LinkDetail() {
         <LinkNotificationManager linkId={link.id} />
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12 }}
-      >
-        <QRDesignManager link={link} />
-      </motion.div>
-
       {showEdit && (
         <LinkFormDialog
           link={link}
@@ -735,6 +739,13 @@ export default function LinkDetail() {
         <QRDialog
           link={link}
           onClose={() => setShowQr(false)}
+        />
+      )}
+
+      {showQrDesigns && (
+        <QRDesignDialog
+          link={link}
+          onClose={() => setShowQrDesigns(false)}
         />
       )}
     </div>

@@ -21,7 +21,7 @@ export default function LinkRecentActivity({ clicks }) {
           <p className="text-sm text-muted-foreground">No clicks yet</p>
         </div>
       ) : (
-        <div className="relative">
+        <div className="relative max-h-80 overflow-y-auto overscroll-y-contain">
           <div
             className="absolute left-[15px] top-3 bottom-3 w-px bg-border"
             aria-hidden
