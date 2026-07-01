@@ -116,6 +116,7 @@ export default function QRCodePreview({
   containerRef,
   preloadedLogoUrl,
   onReady,
+  qrExportRef,
 }) {
   const fgColor = design?.fg_color || "#000000";
   const bgColor = design?.bg_color || "#ffffff";
@@ -208,6 +209,9 @@ export default function QRCodePreview({
 
       if (isFirstRender) {
         qrInstanceRef.current = new QRCodeStyling(options);
+        if (qrExportRef) {
+          qrExportRef.current = qrInstanceRef.current;
+        }
         mountRef.current.innerHTML = "";
         qrInstanceRef.current.append(mountRef.current);
       } else {
@@ -261,10 +265,13 @@ export default function QRCodePreview({
     const node = mountRef.current;
     return () => {
       qrInstanceRef.current = null;
+      if (qrExportRef) {
+        qrExportRef.current = null;
+      }
       readyCalledRef.current = false;
       if (node) node.innerHTML = "";
     };
-  }, [mountRef]);
+  }, [mountRef, qrExportRef]);
 
   return (
     <div

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import db from "@/api/openClient";
 import { getShortUrl } from "@/lib/qrcode";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import QRCodePreview, { prepareQRDesign } from "@/components/qr/QRCodePreview";
 import FormDialog, { FormDialogBody } from "@/components/ui/form-dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ const CONTAINER_SIZE = PREVIEW_SIZE + 32;
 export default function QRDialog({ link, onClose }) {
   const shortUrl = getShortUrl(link.slug, link.custom_domain);
   const previewRef = useRef(null);
+  const qrExportRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [prepared, setPrepared] = useState(null);
 
@@ -58,7 +59,7 @@ export default function QRDialog({ link, onClose }) {
   function downloadPng() {
     const canvas = previewRef.current?.querySelector("canvas");
     if (!canvas) {
-      toast({ title: "QR not ready", description: "Please wait and try again." });
+      toast.error("QR not ready", { description: "Please wait and try again." });
       return;
     }
 
@@ -69,18 +70,26 @@ export default function QRDialog({ link, onClose }) {
       a.download = `qr-${link.slug}.png`;
       a.click();
     } catch {
-      toast({
-        title: "Download failed",
+      toast.error("Download failed", {
         description: "Logo host may block export (CORS). Use a CORS-enabled logo URL.",
       });
     }
   }
 
-  function downloadSvg() {
-    toast({
-      title: "Use PNG for full design",
-      description: "SVG export for custom logo designs is not supported in this dialog yet.",
-    });
+  async function downloadSvg() {
+    const qr = qrExportRef.current;
+    if (!qr) {
+      toast.error("QR not ready", { description: "Please wait and try again." });
+      return;
+    }
+
+    try {
+      await qr.download({ name: `qr-${link.slug}`, extension: "svg" });
+    } catch {
+      toast.error("Download failed", {
+        description: "Logo host may block export (CORS). Use a CORS-enabled logo URL.",
+      });
+    }
   }
 
   const bgColor = prepared?.design.bg_color || "#ffffff";
@@ -113,6 +122,7 @@ export default function QRDialog({ link, onClose }) {
                 displaySize={PREVIEW_SIZE}
                 containerRef={previewRef}
                 preloadedLogoUrl={prepared.resolvedLogoUrl}
+                qrExportRef={qrExportRef}
                 onReady={handleQrReady}
               />
             </div>
