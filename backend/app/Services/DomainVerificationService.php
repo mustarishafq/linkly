@@ -27,9 +27,19 @@ class DomainVerificationService
         foreach ($targets as $target) {
             try {
                 $records = dns_get_record($target, DNS_TXT);
+                // dns_get_record() returns `txt` as a string (and `entries` as chunks).
+                // flatMap on a string is collapsed away by Laravel, so matchers saw no records.
                 $flattened = collect($records ?: [])
-                    ->flatMap(fn ($entry) => $entry['txt'] ?? [])
-                    ->map(fn ($txt) => is_array($txt) ? implode('', $txt) : (string) $txt)
+                    ->map(function ($entry) {
+                        if (! empty($entry['entries']) && is_array($entry['entries'])) {
+                            return implode('', $entry['entries']);
+                        }
+
+                        $txt = $entry['txt'] ?? '';
+
+                        return is_array($txt) ? implode('', $txt) : (string) $txt;
+                    })
+                    ->map(fn ($txt) => trim($txt))
                     ->filter()
                     ->values()
                     ->all();
