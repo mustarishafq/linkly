@@ -81,10 +81,28 @@
     "ab_variant": {
       "type": "string",
       "description": "Which A/B variant was served"
+    },
+    "link_tree_id": {
+      "type": "integer",
+      "description": "Associated Link Tree ID (Link Tree events only)"
+    },
+    "event": {
+      "type": "string",
+      "enum": ["page_view", "block_click"],
+      "description": "Link Tree event type"
+    },
+    "block_id": {
+      "type": "string",
+      "description": "Link Tree block id or social:platform"
+    },
+    "block_title": {
+      "type": "string"
+    },
+    "block_type": {
+      "type": "string"
     }
   },
   "required": [
-    "link_id",
     "slug"
   ]
 }

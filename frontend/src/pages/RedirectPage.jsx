@@ -7,7 +7,7 @@ import { useParams } from "react-router-dom";
 
 import { Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { detectBrowser, detectDevice, detectPlatform, detectReferrerSource } from "@/lib/clickContext";
 
 function normalizeHost(value) {
   const raw = String(value || "").trim().toLowerCase();
@@ -272,39 +272,6 @@ export default function RedirectPage() {
       </div>
     </div>
   );
-}
-
-function detectBrowser(ua) {
-  if (ua.includes("Firefox")) return { name: "Firefox", version: ua.match(/Firefox\/([\d.]+)/)?.[1] || "" };
-  if (ua.includes("Edg")) return { name: "Edge", version: ua.match(/Edg\/([\d.]+)/)?.[1] || "" };
-  if (ua.includes("Chrome")) return { name: "Chrome", version: ua.match(/Chrome\/([\d.]+)/)?.[1] || "" };
-  if (ua.includes("Safari")) return { name: "Safari", version: ua.match(/Version\/([\d.]+)/)?.[1] || "" };
-  return { name: "Other", version: "" };
-}
-
-function detectDevice(ua) {
-  if (/tablet|ipad/i.test(ua)) return "Tablet";
-  if (/mobile|iphone|android.*mobile/i.test(ua)) return "Mobile";
-  return "Desktop";
-}
-
-function detectPlatform(ua) {
-  if (/windows/i.test(ua)) return "Windows";
-  if (/macintosh|mac os/i.test(ua)) return "macOS";
-  if (/iphone|ipad/i.test(ua)) return "iOS";
-  if (/android/i.test(ua)) return "Android";
-  if (/linux/i.test(ua)) return "Linux";
-  return "Other";
-}
-
-function detectReferrerSource(referrer) {
-  if (!referrer) return "Direct";
-  if (referrer.includes("facebook.com") || referrer.includes("fb.com")) return "Facebook";
-  if (referrer.includes("instagram.com")) return "Instagram";
-  if (referrer.includes("whatsapp")) return "WhatsApp";
-  if (referrer.includes("twitter.com") || referrer.includes("t.co")) return "Twitter";
-  if (referrer.includes("google.com")) return "Google";
-  return "Other";
 }
 
 function selectVariant(variants) {

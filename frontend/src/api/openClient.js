@@ -387,6 +387,17 @@ const linkTrees = {
   async getPublic(slug) {
     return request(`/link-trees/public/${encodeURIComponent(slug)}`);
   },
+
+  /**
+   * @param {string} slug
+   * @param {Record<string, any>} payload
+   */
+  async track(slug, payload) {
+    return request(`/link-trees/public/${encodeURIComponent(slug)}/events`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
 };
 
 const settings = {

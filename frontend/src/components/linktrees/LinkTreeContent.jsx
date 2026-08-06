@@ -1,3 +1,4 @@
+import { trackLinkTreeEvent } from "@/lib/linkTreeAnalytics";
 import {
   Instagram,
   Twitter,
@@ -38,7 +39,7 @@ const SOCIAL_ICONS = {
   website: Globe,
 };
 
-function BlockButton({ theme, href, children, compact, icon: Icon }) {
+function BlockButton({ theme, href, children, compact, icon: Icon, onTrack }) {
   const btn = linkButtonClass(theme, { compact });
   const content = (
     <span className="inline-flex items-center justify-center gap-2">
@@ -62,13 +63,14 @@ function BlockButton({ theme, href, children, compact, icon: Icon }) {
       rel={href.startsWith("mailto:") || href.startsWith("tel:") ? undefined : "noopener noreferrer"}
       className={btn.className}
       style={btn.style}
+      onClick={() => onTrack?.()}
     >
       {content}
     </a>
   );
 }
 
-function VideoBlock({ link, theme, compact }) {
+function VideoBlock({ link, theme, compact, onTrack }) {
   const surface = treeSurfaceClasses(theme);
   const embed = getVideoEmbedUrl(link.url);
   if (!embed) {
@@ -81,6 +83,7 @@ function VideoBlock({ link, theme, compact }) {
           "flex items-center gap-2 rounded-xl border px-3 py-3 text-sm",
           surface.videoFallback
         )}
+        onClick={() => onTrack?.(link)}
       >
         <Play className="h-4 w-4" />
         <span className="truncate">{link.title || "Watch video"}</span>
@@ -89,7 +92,7 @@ function VideoBlock({ link, theme, compact }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" onClickCapture={() => onTrack?.(link)}>
       {link.title ? (
         <p className={cn("text-center font-medium", surface.title, compact ? "text-xs" : "text-sm")}>
           {link.title}
@@ -115,12 +118,12 @@ function VideoBlock({ link, theme, compact }) {
   );
 }
 
-function MusicBlock({ link, theme, compact }) {
+function MusicBlock({ link, theme, compact, onTrack }) {
   const surface = treeSurfaceClasses(theme);
   const embed = getMusicEmbedUrl(link.url);
   if (embed) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-2" onClickCapture={() => onTrack?.(link)}>
         {link.title ? (
           <p className={cn("text-center font-medium", surface.title, compact ? "text-xs" : "text-sm")}>
             {link.title}
@@ -139,13 +142,19 @@ function MusicBlock({ link, theme, compact }) {
   }
 
   return (
-    <BlockButton theme={theme} href={resolveBlockHref(link)} compact={compact} icon={Music2}>
+    <BlockButton
+      theme={theme}
+      href={resolveBlockHref(link)}
+      compact={compact}
+      icon={Music2}
+      onTrack={() => onTrack?.(link)}
+    >
       {link.title || "Listen"}
     </BlockButton>
   );
 }
 
-function ImageBlock({ link, theme, compact }) {
+function ImageBlock({ link, theme, compact, onTrack }) {
   const surface = treeSurfaceClasses(theme);
   const src = link.image_url || link.url;
   if (!src) return null;
@@ -165,11 +174,19 @@ function ImageBlock({ link, theme, compact }) {
   return (
     <div className="space-y-2">
       {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="block overflow-hidden">
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block overflow-hidden"
+          onClick={() => onTrack?.(link)}
+        >
           {img}
         </a>
       ) : (
-        <div className="overflow-hidden">{img}</div>
+        <div className="overflow-hidden" onClick={() => onTrack?.(link)}>
+          {img}
+        </div>
       )}
       {link.title ? (
         <p className={cn("text-center font-medium", surface.title, compact ? "text-xs" : "text-sm")}>
@@ -185,7 +202,7 @@ function ImageBlock({ link, theme, compact }) {
   );
 }
 
-export function LinkTreeBlock({ link, theme, compact = false }) {
+export function LinkTreeBlock({ link, theme, compact = false, onTrack }) {
   const type = link.type || "link";
   const surface = treeSurfaceClasses(theme);
 
@@ -225,13 +242,19 @@ export function LinkTreeBlock({ link, theme, compact = false }) {
     );
   }
 
-  if (type === "video") return <VideoBlock link={link} theme={theme} compact={compact} />;
-  if (type === "music") return <MusicBlock link={link} theme={theme} compact={compact} />;
-  if (type === "image") return <ImageBlock link={link} theme={theme} compact={compact} />;
+  if (type === "video") return <VideoBlock link={link} theme={theme} compact={compact} onTrack={onTrack} />;
+  if (type === "music") return <MusicBlock link={link} theme={theme} compact={compact} onTrack={onTrack} />;
+  if (type === "image") return <ImageBlock link={link} theme={theme} compact={compact} onTrack={onTrack} />;
 
   if (type === "email") {
     return (
-      <BlockButton theme={theme} href={resolveBlockHref(link)} compact={compact} icon={Mail}>
+      <BlockButton
+        theme={theme}
+        href={resolveBlockHref(link)}
+        compact={compact}
+        icon={Mail}
+        onTrack={() => onTrack?.(link)}
+      >
         {link.title}
       </BlockButton>
     );
@@ -239,20 +262,32 @@ export function LinkTreeBlock({ link, theme, compact = false }) {
 
   if (type === "phone") {
     return (
-      <BlockButton theme={theme} href={resolveBlockHref(link)} compact={compact} icon={Phone}>
+      <BlockButton
+        theme={theme}
+        href={resolveBlockHref(link)}
+        compact={compact}
+        icon={Phone}
+        onTrack={() => onTrack?.(link)}
+      >
         {link.title}
       </BlockButton>
     );
   }
 
   return (
-    <BlockButton theme={theme} href={resolveBlockHref(link)} compact={compact} icon={ExternalLink}>
+    <BlockButton
+      theme={theme}
+      href={resolveBlockHref(link)}
+      compact={compact}
+      icon={ExternalLink}
+      onTrack={() => onTrack?.(link)}
+    >
       {link.title}
     </BlockButton>
   );
 }
 
-export function LinkTreeSocialRow({ socials, theme, compact = false }) {
+export function LinkTreeSocialRow({ socials, theme, compact = false, onTrackSocial }) {
   const surface = treeSurfaceClasses(theme);
   const items = (socials || []).filter((s) => s?.platform && s?.url);
   if (items.length === 0) return null;
@@ -273,6 +308,7 @@ export function LinkTreeSocialRow({ socials, theme, compact = false }) {
               compact ? "h-8 w-8" : "h-10 w-10",
               surface.social
             )}
+            onClick={() => onTrackSocial?.(social)}
           >
             <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </a>
@@ -290,6 +326,7 @@ export function LinkTreeProfile({
   socials,
   compact = false,
   className,
+  onTrackSocial,
 }) {
   const merged = { ...DEFAULT_THEME, ...(theme || {}) };
   const surface = treeSurfaceClasses(merged);
@@ -337,7 +374,12 @@ export function LinkTreeProfile({
           {bio}
         </p>
       ) : null}
-      <LinkTreeSocialRow socials={socials} theme={merged} compact={compact} />
+      <LinkTreeSocialRow
+        socials={socials}
+        theme={merged}
+        compact={compact}
+        onTrackSocial={onTrackSocial}
+      />
     </div>
   );
 }
@@ -352,6 +394,7 @@ export function LinkTreeContent({
   compact = false,
   className,
   footer,
+  analyticsSlug = null,
 }) {
   const merged = { ...DEFAULT_THEME, ...(theme || {}) };
   const preset = getBackgroundPreset(merged.background_preset);
@@ -359,7 +402,6 @@ export function LinkTreeContent({
   const surface = treeSurfaceClasses(merged);
   const dark = isDarkTheme(merged);
   const visibleLinks = (links || []).filter((l) => {
-    // Public API omits `enabled` (only returns published/enabled blocks). Treat missing as on.
     if (l?.enabled === false) return false;
     const type = l.type || "link";
     if (type === "divider") return true;
@@ -368,6 +410,26 @@ export function LinkTreeContent({
     if (type === "video" || type === "music") return Boolean(l.url?.trim());
     return Boolean((l.title || "").trim() && (l.url || "").trim());
   });
+
+  function trackBlock(link) {
+    if (!analyticsSlug || !link?.id) return;
+    trackLinkTreeEvent(analyticsSlug, {
+      event: "block_click",
+      block_id: String(link.id),
+      block_title: link.title || "",
+      block_type: link.type || "link",
+    });
+  }
+
+  function trackSocial(social) {
+    if (!analyticsSlug || !social?.platform) return;
+    trackLinkTreeEvent(analyticsSlug, {
+      event: "block_click",
+      block_id: `social:${social.platform}`,
+      block_title: social.platform,
+      block_type: "social",
+    });
+  }
 
   return (
     <div
@@ -389,6 +451,7 @@ export function LinkTreeContent({
             theme={merged}
             socials={socials}
             compact={compact}
+            onTrackSocial={analyticsSlug ? trackSocial : undefined}
           />
           <div className={cn("w-full", compact ? "mt-5 space-y-2.5" : "mt-8 space-y-3")}>
             {visibleLinks.length === 0 ? (
@@ -408,6 +471,7 @@ export function LinkTreeContent({
                   link={link}
                   theme={merged}
                   compact={compact}
+                  onTrack={analyticsSlug ? trackBlock : undefined}
                 />
               ))
             )}

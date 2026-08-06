@@ -264,6 +264,8 @@ class LinkTreeController extends Controller
             'avatar_url' => $match['avatar_url'] ?? null,
             'theme' => $match['theme'] ?? $this->defaultTheme(),
             'socials' => $socials,
+            'total_views' => (int) ($match['total_views'] ?? 0),
+            'total_clicks' => (int) ($match['total_clicks'] ?? 0),
             'links' => array_map(fn ($link) => [
                 'id' => $link['id'] ?? null,
                 'type' => $link['type'] ?? 'link',
@@ -272,9 +274,145 @@ class LinkTreeController extends Controller
                 'description' => $link['description'] ?? '',
                 'image_url' => $link['image_url'] ?? '',
                 'enabled' => true,
+                'clicks' => (int) ($link['clicks'] ?? 0),
                 'sort_order' => (int) ($link['sort_order'] ?? 0),
             ], $enabledLinks),
         ]);
+    }
+
+    public function trackPublicEvent(Request $request, string $slug): JsonResponse
+    {
+        $event = (string) $request->input('event', '');
+        if (! in_array($event, ['page_view', 'block_click'], true)) {
+            return $this->error('invalid_event', 'Event must be page_view or block_click', 422);
+        }
+
+        $table = $this->tableOrFail();
+        if ($table instanceof JsonResponse) {
+            return $table;
+        }
+
+        $match = $this->findPublishedBySlug($table, $slug);
+        if (! $match) {
+            return $this->error('not_found', 'Link tree not found', 404);
+        }
+
+        $isTest = filter_var($request->input('is_test', false), FILTER_VALIDATE_BOOL);
+        $blockId = trim((string) $request->input('block_id', ''));
+        $blockTitle = trim((string) $request->input('block_title', ''));
+        $blockType = trim((string) $request->input('block_type', ''));
+
+        if ($event === 'block_click') {
+            if ($blockId === '') {
+                return $this->error('invalid_block', 'block_id is required for block_click', 422);
+            }
+            $links = is_array($match['links'] ?? null) ? $match['links'] : [];
+            $found = false;
+            foreach ($links as $link) {
+                if ((string) ($link['id'] ?? '') === $blockId && ! empty($link['enabled'])) {
+                    $found = true;
+                    if ($blockTitle === '') {
+                        $blockTitle = (string) ($link['title'] ?? '');
+                    }
+                    if ($blockType === '') {
+                        $blockType = (string) ($link['type'] ?? 'link');
+                    }
+                    break;
+                }
+            }
+            if (! $found) {
+                // Still allow social / unknown targets by title only for social row later
+                if ($blockType !== 'social') {
+                    return $this->error('invalid_block', 'Block not found on this tree', 404);
+                }
+            }
+        }
+
+        $clickTable = $this->entities->tableFor('ClickLog');
+        if (! $clickTable) {
+            return $this->error('not_configured', 'ClickLog entity is not configured', 500);
+        }
+
+        $clickPayload = [
+            'link_id' => null,
+            'link_tree_id' => (int) $match['id'],
+            'slug' => (string) ($match['slug'] ?? ''),
+            'event' => $event,
+            'block_id' => $blockId !== '' ? $blockId : null,
+            'block_title' => $blockTitle !== '' ? mb_substr($blockTitle, 0, 120) : null,
+            'block_type' => $blockType !== '' ? mb_substr($blockType, 0, 40) : null,
+            'timestamp' => (string) ($request->input('timestamp') ?: now()->toIso8601String()),
+            'user_agent' => mb_substr((string) $request->input('user_agent', ''), 0, 500),
+            'browser' => mb_substr((string) $request->input('browser', ''), 0, 60),
+            'browser_version' => mb_substr((string) $request->input('browser_version', ''), 0, 40),
+            'device_type' => $this->normalizeDeviceType((string) $request->input('device_type', '')),
+            'platform' => mb_substr((string) $request->input('platform', ''), 0, 40),
+            'referrer' => mb_substr((string) $request->input('referrer', ''), 0, 500) ?: null,
+            'referrer_source' => $this->normalizeReferrerSource((string) $request->input('referrer_source', '')),
+            'is_unique' => ! $isTest,
+            'is_test' => $isTest,
+            'is_converted' => false,
+        ];
+
+        $this->entities->create($clickTable, 'ClickLog', $clickPayload, null);
+
+        if (! $isTest) {
+            $patch = [];
+            if ($event === 'page_view') {
+                $patch['total_views'] = ((int) ($match['total_views'] ?? 0)) + 1;
+            }
+            if ($event === 'block_click') {
+                $patch['total_clicks'] = ((int) ($match['total_clicks'] ?? 0)) + 1;
+                $links = is_array($match['links'] ?? null) ? $match['links'] : [];
+                foreach ($links as $index => $link) {
+                    if ((string) ($link['id'] ?? '') === $blockId) {
+                        $links[$index]['clicks'] = ((int) ($link['clicks'] ?? 0)) + 1;
+                    }
+                }
+                $patch['links'] = $links;
+            }
+            if ($patch !== []) {
+                $this->entities->update($table, self::ENTITY, (string) $match['id'], $patch, null);
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'event' => $event,
+            'link_tree_id' => (int) $match['id'],
+        ]);
+    }
+
+    private function findPublishedBySlug(string $table, string $slug): ?array
+    {
+        $normalized = $this->normalizeSlug($slug);
+        if ($normalized === '') {
+            return null;
+        }
+
+        foreach ($this->entities->fetchAll($table) as $row) {
+            if ($this->normalizeSlug((string) ($row['slug'] ?? '')) === $normalized) {
+                if (($row['status'] ?? '') !== 'published') {
+                    return null;
+                }
+
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeDeviceType(string $value): string
+    {
+        return in_array($value, ['Desktop', 'Mobile', 'Tablet'], true) ? $value : 'Desktop';
+    }
+
+    private function normalizeReferrerSource(string $value): string
+    {
+        $allowed = ['Facebook', 'Instagram', 'WhatsApp', 'Twitter', 'Google', 'Direct', 'Email', 'Other'];
+
+        return in_array($value, $allowed, true) ? $value : 'Other';
     }
 
     private function tableOrFail(): string|JsonResponse
@@ -638,6 +776,7 @@ class LinkTreeController extends Controller
             'description' => mb_substr($description, 0, 300),
             'image_url' => mb_substr($imageUrl, 0, 2048),
             'enabled' => array_key_exists('enabled', $link) ? (bool) $link['enabled'] : true,
+            'clicks' => max(0, (int) ($link['clicks'] ?? 0)),
             'sort_order' => $index,
         ];
     }

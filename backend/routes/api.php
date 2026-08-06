@@ -62,6 +62,7 @@ Route::prefix('mcp/v1')->middleware([
 });
 
 Route::get('/link-trees/public/{slug}', [LinkTreeController::class, 'publicShow']);
+Route::post('/link-trees/public/{slug}/events', [LinkTreeController::class, 'trackPublicEvent']);
 
 Route::middleware(JwtAuth::class)->group(function () {
     Route::get('/users/directory', [AuthController::class, 'userDirectory']);

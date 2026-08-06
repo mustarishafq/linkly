@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Plus,
-  Trees,
+  GalleryVertical,
   MoreHorizontal,
   Trash2,
   Edit,
@@ -102,7 +102,7 @@ function CreateTreeDialog({ onClose, onCreated }) {
   }
 
   return (
-    <FormDialog onClose={onClose} title="New link tree" icon={Trees} maxWidth="md">
+    <FormDialog onClose={onClose} title="New link tree" icon={GalleryVertical} maxWidth="md">
       <form onSubmit={handleSubmit}>
         <FormDialogBody className="space-y-4">
           <div className="space-y-2">
@@ -250,7 +250,7 @@ export default function LinkTrees() {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Trees}
+        icon={GalleryVertical}
         title="Link Trees"
         description="Create and customize multi-link public pages"
         action={
@@ -262,7 +262,7 @@ export default function LinkTrees() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        <StatCard icon={Trees} label="Your trees" value={trees.length} />
+        <StatCard icon={GalleryVertical} label="Your trees" value={trees.length} />
         <StatCard icon={Eye} label="Published" value={publishedCount} />
         <StatCard icon={Link2} label="Total links" value={totalLinks} className="col-span-2 lg:col-span-1" />
       </div>
@@ -304,7 +304,7 @@ export default function LinkTrees() {
 
         {filtered.length === 0 ? (
           <div className="text-center py-12 space-y-3">
-            <Trees className="h-10 w-10 text-muted-foreground mx-auto opacity-50" />
+            <GalleryVertical className="h-10 w-10 text-muted-foreground mx-auto opacity-50" />
             <p className="text-sm text-muted-foreground">
               {trees.length === 0
                 ? "No link trees yet. Create one to share a page of links."

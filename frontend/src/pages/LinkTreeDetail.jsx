@@ -17,6 +17,8 @@ import {
   Palette,
   LayoutList,
   Link2,
+  BarChart3,
+  MousePointerClick,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import BackButton from "@/components/ui/BackButton";
@@ -39,6 +41,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LinkTreeContent } from "@/components/linktrees/LinkTreeContent";
+import { summarizeLinkTreeClicks } from "@/lib/linkTreeAnalytics";
+import StatCard from "@/components/ui/StatCard";
 import {
   AVATAR_SHAPES,
   BACKGROUND_PRESETS,
@@ -61,6 +65,7 @@ const EDITOR_TABS = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "design", label: "Design", icon: Palette },
   { id: "blocks", label: "Blocks", icon: LayoutList },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 function EditorSkeleton() {
@@ -300,6 +305,8 @@ export default function LinkTreeDetail() {
   const [theme, setTheme] = useState(DEFAULT_THEME);
   const [links, setLinks] = useState([]);
   const [socials, setSocials] = useState([]);
+  const [stats, setStats] = useState({ views: 0, clicks: 0, uniqueDevices: 0, byBlock: [] });
+  const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -322,10 +329,17 @@ export default function LinkTreeDetail() {
             type: "link",
             description: "",
             image_url: "",
+            clicks: 0,
             ...l,
           }))
         );
         setSocials(Array.isArray(tree.socials) ? tree.socials : []);
+        setStats({
+          views: tree.total_views || 0,
+          clicks: tree.total_clicks || 0,
+          uniqueDevices: 0,
+          byBlock: [],
+        });
       } catch {
         if (!cancelled) setNotFound(true);
       } finally {
@@ -337,6 +351,41 @@ export default function LinkTreeDetail() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (tab !== "analytics" || !id) return;
+    let cancelled = false;
+    async function loadStats() {
+      setStatsLoading(true);
+      try {
+        const treeId = Number(id);
+        const [byNumber, byString] = await Promise.all([
+          db.entities.ClickLog.filter({ link_tree_id: treeId }, "-created_date", 1000),
+          db.entities.ClickLog.filter({ link_tree_id: String(id) }, "-created_date", 1000),
+        ]);
+        const merged = [...byNumber, ...byString];
+        const unique = [];
+        const seen = new Set();
+        for (const row of merged) {
+          const key = row.id ?? `${row.timestamp}-${row.event}-${row.block_id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          unique.push(row);
+        }
+        if (!cancelled) setStats(summarizeLinkTreeClicks(unique));
+      } catch {
+        if (!cancelled) {
+          /* keep counter snapshot from tree payload */
+        }
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    }
+    loadStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, id]);
 
   function slugify(value) {
     return String(value || "")
@@ -863,6 +912,11 @@ export default function LinkTreeDetail() {
                                     <span className="text-[10px] uppercase tracking-wide font-semibold text-primary/80 px-2 py-0.5 rounded-md bg-primary/10">
                                       {meta.label}
                                     </span>
+                                    {(link.clicks || 0) > 0 ? (
+                                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                                        {link.clicks} clicks
+                                      </span>
+                                    ) : null}
                                     <div className="flex-1" />
                                     <Switch
                                       id={`enabled-${link.id}`}
@@ -892,6 +946,70 @@ export default function LinkTreeDetail() {
                   </Droppable>
                 </DragDropContext>
               )}
+            </TabsContent>
+
+            <TabsContent value="analytics" className="mt-0 p-4 sm:p-5 space-y-5 focus-visible:outline-none">
+              <div>
+                <h3 className="text-sm font-semibold">Performance</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Page views and block clicks from your public Link Tree
+                </p>
+              </div>
+
+              {statsLoading ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <Skeleton className="h-[88px] rounded-2xl" />
+                  <Skeleton className="h-[88px] rounded-2xl" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <StatCard icon={Eye} label="Page views" value={stats.views} accent="info" />
+                  <StatCard icon={MousePointerClick} label="Block clicks" value={stats.clicks} accent="primary" />
+                </div>
+              )}
+
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border bg-muted/30">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Clicks by block
+                  </p>
+                </div>
+                {statsLoading ? (
+                  <div className="p-4 space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : stats.byBlock.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-10 px-4">
+                    No block clicks yet. Share your published page to start collecting data.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {stats.byBlock.map((row) => {
+                      const max = Math.max(...stats.byBlock.map((b) => b.clicks), 1);
+                      const pct = Math.round((row.clicks / max) * 100);
+                      return (
+                        <li key={row.block_id || row.block_title} className="px-4 py-3 space-y-1.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{row.block_title}</p>
+                              <p className="text-[11px] text-muted-foreground capitalize">{row.block_type}</p>
+                            </div>
+                            <span className="text-sm font-semibold tabular-nums shrink-0">{row.clicks}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              <p className="text-[11px] text-muted-foreground">
+                Counters update when visitors open /t/{slug || "…"} and tap blocks. Preview mode is excluded.
+              </p>
             </TabsContent>
           </Tabs>
         </motion.div>

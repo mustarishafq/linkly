@@ -19,6 +19,16 @@ export function isTestClick(click) {
   return Boolean(click?.is_test);
 }
 
+/** True when the click belongs to a Link Tree (not a short link). */
+export function isLinkTreeClick(click) {
+  return Boolean(click?.link_tree_id) || click?.event === "page_view" || click?.event === "block_click";
+}
+
+/** Official short-link clicks only (excludes previews and Link Tree events). */
 export function filterOfficialClicks(clicks) {
-  return clicks.filter((click) => !isTestClick(click));
+  return clicks.filter((click) => !isTestClick(click) && !isLinkTreeClick(click));
+}
+
+export function filterOfficialLinkTreeClicks(clicks) {
+  return clicks.filter((click) => !isTestClick(click) && isLinkTreeClick(click));
 }

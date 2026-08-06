@@ -1,10 +1,11 @@
 import db from "@/api/openClient";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Trees } from "lucide-react";
+import { GalleryVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { LinkTreeContent } from "@/components/linktrees/LinkTreeContent";
+import { trackLinkTreeEvent } from "@/lib/linkTreeAnalytics";
 import { DEFAULT_THEME, treeSurfaceClasses } from "@/lib/linkTreeTheme";
 import { APP_NAME } from "@/lib/settingsConfig";
 
@@ -13,9 +14,11 @@ export default function LinkTreePublicPage() {
   const [tree, setTree] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const trackedView = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    trackedView.current = false;
     async function load() {
       setLoading(true);
       setError(null);
@@ -36,6 +39,12 @@ export default function LinkTreePublicPage() {
       cancelled = true;
     };
   }, [slug]);
+
+  useEffect(() => {
+    if (!tree?.slug || trackedView.current) return;
+    trackedView.current = true;
+    trackLinkTreeEvent(tree.slug, { event: "page_view" });
+  }, [tree?.slug]);
 
   useEffect(() => {
     if (!tree?.title) return;
@@ -59,7 +68,7 @@ export default function LinkTreePublicPage() {
       <div className="min-h-screen flex items-center justify-center bg-background p-6 text-foreground">
         <div className="max-w-sm w-full text-center space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
           <div className="mx-auto w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center">
-            <Trees className="h-6 w-6 text-muted-foreground" />
+            <GalleryVertical className="h-6 w-6 text-muted-foreground" />
           </div>
           <h1 className="text-xl font-semibold">Page not found</h1>
           <p className="text-sm text-muted-foreground">
@@ -84,6 +93,7 @@ export default function LinkTreePublicPage() {
       theme={theme}
       links={tree.links}
       socials={tree.socials}
+      analyticsSlug={tree.slug}
       className="min-h-screen"
       footer={
         theme.show_branding !== false ? (
