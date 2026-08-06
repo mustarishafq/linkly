@@ -17,7 +17,9 @@ return [
         'CustomDomain',
         'QRDesign',
         'LinkNotificationRule',
+        'LinkTree',
         'RedirectRule',
         'ShortLink',
     ],
 ];
+

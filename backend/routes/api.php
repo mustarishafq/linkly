@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\EntityController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\LinkTreeController;
 use App\Http\Controllers\ImageProxyController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SettingsController;
@@ -60,6 +61,8 @@ Route::prefix('mcp/v1')->middleware([
     Route::get('/audit-logs', [McpAuditLogController::class, 'index']);
 });
 
+Route::get('/link-trees/public/{slug}', [LinkTreeController::class, 'publicShow']);
+
 Route::middleware(JwtAuth::class)->group(function () {
     Route::get('/users/directory', [AuthController::class, 'userDirectory']);
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -70,6 +73,12 @@ Route::middleware(JwtAuth::class)->group(function () {
     Route::get('/settings/qr-default', [SettingsController::class, 'qrDefault']);
     Route::get('/settings/general-defaults', [SettingsController::class, 'generalDefaults']);
     Route::post('/uploads/logo', [UploadController::class, 'logo']);
+
+    Route::get('/link-trees', [LinkTreeController::class, 'index']);
+    Route::post('/link-trees', [LinkTreeController::class, 'store']);
+    Route::get('/link-trees/{id}', [LinkTreeController::class, 'show']);
+    Route::patch('/link-trees/{id}', [LinkTreeController::class, 'update']);
+    Route::delete('/link-trees/{id}', [LinkTreeController::class, 'destroy']);
 });
 
 Route::middleware([JwtAuth::class, AdminRequired::class])->group(function () {

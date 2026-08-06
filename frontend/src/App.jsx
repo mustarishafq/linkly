@@ -17,6 +17,9 @@ import ClickHistory from "./pages/ClickHistory";
 import ABTesting from "./pages/ABTesting";
 import SmartRedirects from "./pages/SmartRedirects";
 import Domains from "./pages/Domains";
+import LinkTrees from "./pages/LinkTrees";
+import LinkTreeDetail from "./pages/LinkTreeDetail";
+import LinkTreePublicPage from "./pages/LinkTreePublicPage";
 import RedirectPage from "./pages/RedirectPage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -44,6 +47,7 @@ const AuthenticatedApp = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/t/:slug" element={<LinkTreePublicPage />} />
         <Route path="/:slug" element={<RedirectPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
@@ -70,12 +74,15 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route path="/sso/nexus" element={<SsoNexus />} />
+      <Route path="/t/:slug" element={<LinkTreePublicPage />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/links" element={<Links />} />
         <Route path="/links/:id" element={<LinkDetail />} />
         <Route path="/campaigns" element={<Campaigns />} />
         <Route path="/campaigns/:id" element={<CampaignDetail />} />
+        <Route path="/linktrees" element={<LinkTrees />} />
+        <Route path="/linktrees/:id" element={<LinkTreeDetail />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/history" element={<ClickHistory />} />
         <Route path="/ab-testing" element={<ABTesting />} />

@@ -1,0 +1,104 @@
+{
+  "name": "LinkTree",
+  "type": "object",
+  "properties": {
+    "owner_user_id": {
+      "type": "integer",
+      "description": "User ID who owns this link tree"
+    },
+    "slug": {
+      "type": "string",
+      "description": "Public path segment for /t/{slug}"
+    },
+    "title": {
+      "type": "string",
+      "description": "Display name shown on the public page"
+    },
+    "bio": {
+      "type": "string",
+      "description": "Short supporting text under the title"
+    },
+    "avatar_url": {
+      "type": "string",
+      "description": "Optional profile image URL"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "published", "paused"],
+      "default": "draft"
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "background_preset": {
+          "type": "string",
+          "enum": ["slate", "ocean", "forest", "sunset", "midnight", "sand", "bloom", "aurora", "paper", "ember"],
+          "default": "slate"
+        },
+        "button_style": {
+          "type": "string",
+          "enum": ["solid", "outline", "soft", "glass"],
+          "default": "solid"
+        },
+        "button_radius": {
+          "type": "string",
+          "enum": ["rounded", "pill", "square"],
+          "default": "rounded"
+        },
+        "font_style": {
+          "type": "string",
+          "enum": ["sans", "display", "mono"],
+          "default": "sans"
+        },
+        "avatar_shape": {
+          "type": "string",
+          "enum": ["circle", "rounded"],
+          "default": "circle"
+        },
+        "accent_color": {
+          "type": "string",
+          "default": "#0f766e"
+        },
+        "show_branding": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "socials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": ["instagram", "x", "tiktok", "youtube", "linkedin", "facebook", "github", "website"]
+          },
+          "url": { "type": "string" }
+        },
+        "required": ["platform", "url"]
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["link", "video", "music", "image", "header", "text", "email", "phone", "divider"],
+            "default": "link"
+          },
+          "title": { "type": "string" },
+          "url": { "type": "string" },
+          "description": { "type": "string" },
+          "image_url": { "type": "string" },
+          "enabled": { "type": "boolean", "default": true },
+          "sort_order": { "type": "integer", "default": 0 }
+        }
+      }
+    }
+  },
+  "required": ["title", "slug"]
+}

@@ -6,6 +6,8 @@ export const RESERVED_SHORT_LINK_SLUGS = new Set([
   "sso",
   "links",
   "campaigns",
+  "linktrees",
+  "t",
   "analytics",
   "history",
   "ab-testing",

@@ -5,6 +5,7 @@ const ENTITY_NAMES = [
   "CustomDomain",
   "QRDesign",
   "LinkNotificationRule",
+  "LinkTree",
   "RedirectRule",
   "ShortLink",
 ];
@@ -346,6 +347,48 @@ const domains = {
   },
 };
 
+const linkTrees = {
+  async list(sortBy = "-created_date", limit = 200) {
+    const params = new URLSearchParams();
+    params.set("sortBy", sortBy);
+    params.set("limit", String(limit));
+    return request(`/link-trees?${params.toString()}`);
+  },
+
+  /** @param {string} id */
+  async get(id) {
+    return request(`/link-trees/${id}`);
+  },
+
+  /** @param {Record<string, any>} data */
+  async create(data) {
+    return request("/link-trees", {
+      method: "POST",
+      body: JSON.stringify(data || {}),
+    });
+  },
+
+  /** @param {string} id @param {Record<string, any>} patch */
+  async update(id, patch) {
+    return request(`/link-trees/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch || {}),
+    });
+  },
+
+  /** @param {string} id */
+  async delete(id) {
+    return request(`/link-trees/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  /** @param {string} slug */
+  async getPublic(slug) {
+    return request(`/link-trees/public/${encodeURIComponent(slug)}`);
+  },
+};
+
 const settings = {
   async get() {
     return request("/settings");
@@ -427,7 +470,7 @@ const users = {
   },
 };
 
-const db = { auth, entities, integrations, admin, domains, settings, uploads, users, notifications };
+const db = { auth, entities, integrations, admin, domains, linkTrees, settings, uploads, users, notifications };
 
 export { db };
 export default db;

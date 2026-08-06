@@ -4,6 +4,7 @@ import {
   BarChart3,
   Grip,
   Link2,
+  Trees,
   History,
   FlaskConical,
   Route,
@@ -26,6 +27,7 @@ const DESKTOP_NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Link2, label: "Links", path: "/links" },
   { icon: Megaphone, label: "Campaigns", path: "/campaigns" },
+  { icon: Trees, label: "Link Trees", path: "/linktrees" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: History, label: "History", path: "/history" },
   { icon: FlaskConical, label: "A/B Testing", path: "/ab-testing" },
@@ -39,6 +41,7 @@ const DESKTOP_NAV_ITEMS = [
 const MOBILE_DOCK_PATHS = new Set(["/", "/campaigns", "/links", "/analytics"]);
 
 const MOBILE_MORE_PATHS = [
+  "/linktrees",
   "/history",
   "/ab-testing",
   "/redirects",

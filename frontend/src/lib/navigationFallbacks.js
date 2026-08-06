@@ -1,6 +1,7 @@
 const FALLBACK_RULES = [
   [/^\/links\/[^/]+/, "/links"],
   [/^\/campaigns\/[^/]+/, "/campaigns"],
+  [/^\/linktrees\/[^/]+/, "/linktrees"],
 ];
 
 export function getNavigationFallback(pathname) {

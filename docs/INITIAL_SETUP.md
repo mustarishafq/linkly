@@ -755,6 +755,7 @@ API: `GET` / `PATCH /api/settings` (admin JWT required). Secrets are redacted on
 | **Dashboard / Links** | CRUD for `ShortLink` entities |
 | **Public route** | `/r/:slug` — `RedirectPage.jsx` resolves slug and redirects (no login required) |
 | **Campaigns** | Group links under `Campaign` entities |
+| **Link Trees** | Multi-link public pages (`LinkTree`) at `/t/:slug`; users own multiple trees. Blocks: link, video (YouTube/Vimeo), music (Spotify), image, header, text, email, phone, divider. Theme: 10 backgrounds, button style/shape, font, avatar shape, social icons. API: `/api/link-trees` (auth + ownership), `GET /api/link-trees/public/{slug}` |
 | **A/B testing** | `ABVariant` entities + AB Testing page |
 | **Smart redirects** | `RedirectRule` entities (geo, device, time rules) |
 | **Analytics** | Click logs, charts, referrer/device breakdowns |
@@ -801,6 +802,8 @@ Sensitive fields (passwords, tokens, secrets) are stripped before persistence.
 ```
 [ ] Create short link → appears in Links; row in entity_shortlink with integer id
 [ ] Open /r/{slug} in incognito → redirects to destination
+[ ] Create link tree → appears in Link Trees; publish → /t/{slug} shows public page
+[ ] Non-owner cannot update another user’s link tree (403)
 [ ] Add link notification rule → threshold triggers in-app notification (bell)
 [ ] Admin: approve a new user → user can access dashboard
 [ ] Admin: Audit Logs shows entity_created / user_approval_updated entries
@@ -849,6 +852,7 @@ Entities are registered in `backend/config/linkly.php` and mirrored in `frontend
 | CustomDomain | `entity_customdomain` |
 | QRDesign | `qr_designs` (relational; API entity name `QRDesign`) |
 | LinkNotificationRule | `entity_linknotificationrule` (+ dedicated migration) |
+| LinkTree | `entity_linktree` |
 | RedirectRule | `entity_redirectrule` |
 | ShortLink | `entity_shortlink` |
 
