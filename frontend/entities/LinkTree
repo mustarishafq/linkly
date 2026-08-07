@@ -117,13 +117,17 @@
           "id": { "type": "string" },
           "type": {
             "type": "string",
-            "enum": ["link", "video", "music", "image", "header", "text", "email", "phone", "divider"],
+            "enum": ["link", "custom", "video", "music", "image", "header", "text", "email", "phone", "whatsapp", "maps", "divider"],
             "default": "link"
           },
           "title": { "type": "string" },
           "url": { "type": "string" },
           "description": { "type": "string" },
           "image_url": { "type": "string" },
+          "icon": {
+            "type": "string",
+            "description": "Lucide icon id for custom blocks"
+          },
           "enabled": { "type": "boolean", "default": true },
           "sort_order": { "type": "integer", "default": 0 }
         }

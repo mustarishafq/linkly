@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import BackButton from "@/components/ui/BackButton";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LinkTreeContent } from "@/components/linktrees/LinkTreeContent";
 import { summarizeLinkTreeClicks } from "@/lib/linkTreeAnalytics";
+import {
+  CUSTOM_BLOCK_ICONS,
+  DEFAULT_CUSTOM_BLOCK_ICON,
+  normalizeCustomBlockIcon,
+} from "@/lib/linkTreeIcons";
 import StatCard from "@/components/ui/StatCard";
 import {
   AVATAR_SHAPES,
@@ -61,6 +66,7 @@ import {
   getBackgroundImageStyle,
   getBackgroundPreset,
   getBlockType,
+  isContactBlockType,
   isDarkTheme,
   newLinkItem,
   normalizeHttpUrl,
@@ -74,6 +80,10 @@ const EDITOR_TABS = [
   { id: "blocks", label: "Blocks", icon: LayoutList },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
 ];
+
+const ACCEPTED_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+const UPLOAD_ACCEPT = "image/jpeg,image/png,image/webp,image/gif,image/svg+xml";
 
 function EditorSkeleton() {
   return (
@@ -260,9 +270,10 @@ function BlockFields({ link, updateLink }) {
     );
   }
 
-  if (type === "email" || type === "phone") {
+  if (type === "custom") {
+    const selectedIcon = normalizeCustomBlockIcon(link.icon);
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Input
           value={link.title || ""}
           onChange={(e) => updateLink(link.id, { title: e.target.value })}
@@ -271,7 +282,57 @@ function BlockFields({ link, updateLink }) {
         <Input
           value={link.url || ""}
           onChange={(e) => updateLink(link.id, { url: e.target.value })}
-          placeholder={type === "email" ? "you@example.com" : "+60 12-345 6789"}
+          placeholder="https://example.com"
+        />
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium text-muted-foreground">Icon</p>
+          <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-40 overflow-y-auto rounded-xl border border-border bg-muted/30 p-2">
+            {CUSTOM_BLOCK_ICONS.map(({ id, label, Icon }) => {
+              const active = selectedIcon === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={active}
+                  onClick={() => updateLink(link.id, { icon: id })}
+                  className={cn(
+                    "inline-flex h-8 w-full items-center justify-center rounded-lg border transition-colors",
+                    active
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-transparent bg-card text-muted-foreground hover:text-foreground hover:border-border"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "email" || type === "phone" || type === "whatsapp" || type === "maps") {
+    const placeholders = {
+      email: { title: "Button label", url: "you@example.com" },
+      phone: { title: "Button label", url: "+60 12-345 6789" },
+      whatsapp: { title: "Button label", url: "+60 12-345 6789 or https://wa.me/…" },
+      maps: { title: "Button label", url: "Address or Google Maps URL" },
+    };
+    const ph = placeholders[type];
+    return (
+      <div className="space-y-2">
+        <Input
+          value={link.title || ""}
+          onChange={(e) => updateLink(link.id, { title: e.target.value })}
+          placeholder={ph.title}
+        />
+        <Input
+          value={link.url || ""}
+          onChange={(e) => updateLink(link.id, { url: e.target.value })}
+          placeholder={ph.url}
         />
       </div>
     );
@@ -447,27 +508,44 @@ export default function LinkTreeDetail() {
 
   async function handleAvatarUpload(e) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
+
+    if (!ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+      toast.error("Choose a JPG, PNG, WebP, GIF, or SVG image");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error("Photo must be 2 MB or smaller");
+      return;
+    }
+
     setUploading(true);
     try {
       const result = await db.uploads.logo(file);
       setAvatarUrl(result?.file_url || "");
-      toast({ title: "Avatar uploaded" });
+      toast.success("Avatar uploaded");
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error?.message,
-        variant: "destructive",
-      });
+      toast.error(error?.message || "Upload failed");
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
   }
 
   async function handleBackgroundUpload(e) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
+
+    if (!ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+      toast.error("Choose a JPG, PNG, WebP, GIF, or SVG image");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error("Image must be 2 MB or smaller");
+      return;
+    }
+
     setUploading(true);
     try {
       const result = await db.uploads.logo(file);
@@ -480,16 +558,11 @@ export default function LinkTreeDetail() {
             ? DEFAULT_THEME.overlay_opacity
             : clampOverlayOpacity(t.overlay_opacity),
       }));
-      toast({ title: "Background image uploaded" });
+      toast.success("Background image uploaded");
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error?.message,
-        variant: "destructive",
-      });
+      toast.error(error?.message || "Upload failed");
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
   }
 
@@ -519,11 +592,15 @@ export default function LinkTreeDetail() {
           type: l.type || "link",
           sort_order: i,
           title: l.title?.trim() || "",
-          url: ["email", "phone"].includes(l.type)
+          url: isContactBlockType(l.type)
             ? l.url?.trim() || ""
             : normalizeHttpUrl(l.url) || l.url?.trim() || "",
           description: l.description?.trim() || "",
           image_url: normalizeHttpUrl(l.image_url) || l.image_url?.trim() || "",
+          icon:
+            (l.type || "link") === "custom"
+              ? normalizeCustomBlockIcon(l.icon || DEFAULT_CUSTOM_BLOCK_ICON)
+              : "",
         })),
       });
       setStatus(updated.status);
@@ -531,14 +608,10 @@ export default function LinkTreeDetail() {
       setLinks(Array.isArray(updated.links) ? updated.links : []);
       setSocials(Array.isArray(updated.socials) ? updated.socials : []);
       setTheme({ ...DEFAULT_THEME, ...(updated.theme || {}) });
-      toast({ title: "Link tree saved" });
+      toast.success("Link tree saved");
       return updated;
     } catch (error) {
-      toast({
-        title: "Could not save",
-        description: error?.message || "Check your fields and try again",
-        variant: "destructive",
-      });
+      toast.error(error?.message || "Could not save. Check your fields and try again.");
       return null;
     } finally {
       setSaving(false);
@@ -566,9 +639,9 @@ export default function LinkTreeDetail() {
   async function copyPublicUrl() {
     try {
       await navigator.clipboard.writeText(publicLinkTreeUrl(slugify(slug)));
-      toast({ title: "Public URL copied" });
+      toast.success("Public URL copied");
     } catch {
-      toast({ title: "Could not copy URL", variant: "destructive" });
+      toast.error("Could not copy URL");
     }
   }
 
@@ -716,7 +789,7 @@ export default function LinkTreeDetail() {
                     <Input
                       id="avatar-upload"
                       type="file"
-                      accept="image/*"
+                      accept={UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={handleAvatarUpload}
                       disabled={uploading}
@@ -845,7 +918,7 @@ export default function LinkTreeDetail() {
                   <Input
                     id="bg-image-upload"
                     type="file"
-                    accept="image/*"
+                    accept={UPLOAD_ACCEPT}
                     className="hidden"
                     onChange={handleBackgroundUpload}
                     disabled={uploading}
@@ -1057,7 +1130,11 @@ export default function LinkTreeDetail() {
                       Add
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-56"
+                    collisionPadding={{ top: 16, bottom: 96, left: 12, right: 12 }}
+                  >
                     {LINK_BLOCK_TYPES.map((type) => (
                       <DropdownMenuItem key={type.id} onClick={() => addBlock(type.id)}>
                         <div className="flex flex-col">
@@ -1076,7 +1153,7 @@ export default function LinkTreeDetail() {
                     <LayoutList className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    No blocks yet. Add links, videos, or headers.
+                    No blocks yet. Add links, phone, WhatsApp, maps, or headers.
                   </p>
                   <Button type="button" size="sm" variant="outline" onClick={() => addBlock("link")} className="gap-1.5">
                     <Plus className="h-3.5 w-3.5" />

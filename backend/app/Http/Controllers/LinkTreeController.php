@@ -87,6 +87,7 @@ class LinkTreeController extends Controller
 
     private const LINK_TYPES = [
         'link',
+        'custom',
         'video',
         'music',
         'image',
@@ -94,7 +95,59 @@ class LinkTreeController extends Controller
         'text',
         'email',
         'phone',
+        'whatsapp',
+        'maps',
         'divider',
+    ];
+
+    /** @var list<string> */
+    private const CUSTOM_BLOCK_ICONS = [
+        'link',
+        'globe',
+        'external',
+        'mail',
+        'phone',
+        'map',
+        'chat',
+        'calendar',
+        'shop',
+        'cart',
+        'gift',
+        'heart',
+        'star',
+        'music',
+        'play',
+        'video',
+        'camera',
+        'image',
+        'mic',
+        'headphones',
+        'book',
+        'briefcase',
+        'users',
+        'home',
+        'store',
+        'coffee',
+        'food',
+        'car',
+        'plane',
+        'ticket',
+        'clipboard',
+        'file',
+        'download',
+        'send',
+        'bell',
+        'sparkles',
+        'zap',
+        'crown',
+        'award',
+        'check',
+        'care',
+        'health',
+        'activity',
+        'leaf',
+        'sun',
+        'moon',
     ];
 
     private const SOCIAL_PLATFORMS = [
@@ -291,6 +344,7 @@ class LinkTreeController extends Controller
                 'url' => $link['url'] ?? '',
                 'description' => $link['description'] ?? '',
                 'image_url' => $link['image_url'] ?? '',
+                'icon' => $link['icon'] ?? '',
                 'enabled' => true,
                 'clicks' => (int) ($link['clicks'] ?? 0),
                 'sort_order' => (int) ($link['sort_order'] ?? 0),
@@ -692,34 +746,76 @@ class LinkTreeController extends Controller
             }
 
             if ($type === 'email') {
-                if ($title === '' && $url === '') {
-                    continue;
+                // Persist incomplete drafts so Add → Save does not drop the block.
+                if ($url !== '') {
+                    $email = preg_replace('/^mailto:/i', '', $url) ?? $url;
+                    if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        return $this->error('invalid_link', 'Invalid email address', 422);
+                    }
+                    $url = $email;
                 }
-                if ($title === '' || $url === '') {
-                    return $this->error('invalid_link', 'Email blocks need a label and email address', 422);
-                }
-                $email = preg_replace('/^mailto:/i', '', $url) ?? $url;
-                if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    return $this->error('invalid_link', 'Invalid email address', 422);
-                }
-                $normalized[] = $this->linkRecord($link, $type, $title, $email, '', '', $index);
+                $label = $title !== '' ? $title : ($url !== '' ? 'Email' : '');
+                $normalized[] = $this->linkRecord($link, $type, $label, $url, '', '', $index);
                 $index++;
 
                 continue;
             }
 
             if ($type === 'phone') {
-                if ($title === '' && $url === '') {
-                    continue;
+                if ($url !== '') {
+                    $phone = preg_replace('/^tel:/i', '', $url) ?? $url;
+                    if (strlen(preg_replace('/[^\d+]/', '', $phone) ?? '') < 3) {
+                        return $this->error('invalid_link', 'Invalid phone number', 422);
+                    }
+                    $url = $phone;
                 }
-                if ($title === '' || $url === '') {
-                    return $this->error('invalid_link', 'Phone blocks need a label and phone number', 422);
+                $label = $title !== '' ? $title : ($url !== '' ? 'Call' : '');
+                $normalized[] = $this->linkRecord($link, $type, $label, $url, '', '', $index);
+                $index++;
+
+                continue;
+            }
+
+            if ($type === 'whatsapp') {
+                if ($url !== '') {
+                    if (preg_match('/^https?:\/\//i', $url)) {
+                        if (! $this->isHttpUrl($url) || ! $this->isWhatsAppUrl($url)) {
+                            return $this->error('invalid_link', 'WhatsApp URL must be a wa.me or WhatsApp link', 422);
+                        }
+                    } else {
+                        $phone = preg_replace('/^tel:/i', '', $url) ?? $url;
+                        if (strlen(preg_replace('/[^\d]/', '', $phone) ?? '') < 3) {
+                            return $this->error('invalid_link', 'Invalid WhatsApp number', 422);
+                        }
+                        $url = $phone;
+                    }
                 }
-                $phone = preg_replace('/^tel:/i', '', $url) ?? $url;
-                if (strlen(preg_replace('/[^\d+]/', '', $phone) ?? '') < 3) {
-                    return $this->error('invalid_link', 'Invalid phone number', 422);
+                $label = $title !== '' ? $title : ($url !== '' ? 'WhatsApp' : '');
+                $normalized[] = $this->linkRecord($link, $type, $label, $url, '', '', $index);
+                $index++;
+
+                continue;
+            }
+
+            if ($type === 'maps') {
+                if ($url !== '' && preg_match('/^https?:\/\//i', $url) && ! $this->isHttpUrl($url)) {
+                    return $this->error('invalid_link', 'Maps URL must be a valid http(s) URL', 422);
                 }
-                $normalized[] = $this->linkRecord($link, $type, $title, $phone, '', '', $index);
+                // Freeform address / place name is allowed (opened via Google Maps search on the public page).
+                $label = $title !== '' ? $title : ($url !== '' ? 'Directions' : '');
+                $normalized[] = $this->linkRecord($link, $type, $label, $url, '', '', $index);
+                $index++;
+
+                continue;
+            }
+
+            if ($type === 'custom') {
+                // Persist incomplete drafts; validate URL when present.
+                if ($url !== '' && ! $this->isHttpUrl($url)) {
+                    return $this->error('invalid_link', 'Custom blocks need a valid http(s) URL', 422);
+                }
+                $label = $title !== '' ? $title : ($url !== '' ? 'Custom link' : '');
+                $normalized[] = $this->linkRecord($link, $type, $label, $url, $description, '', $index);
                 $index++;
 
                 continue;
@@ -823,10 +919,22 @@ class LinkTreeController extends Controller
             'url' => mb_substr($url, 0, 2048),
             'description' => mb_substr($description, 0, 300),
             'image_url' => mb_substr($imageUrl, 0, 2048),
+            'icon' => $this->normalizeBlockIcon($type, $link['icon'] ?? ''),
             'enabled' => array_key_exists('enabled', $link) ? (bool) $link['enabled'] : true,
             'clicks' => max(0, (int) ($link['clicks'] ?? 0)),
             'sort_order' => $index,
         ];
+    }
+
+    private function normalizeBlockIcon(string $type, mixed $icon): string
+    {
+        if ($type !== 'custom') {
+            return '';
+        }
+
+        $value = trim((string) $icon);
+
+        return in_array($value, self::CUSTOM_BLOCK_ICONS, true) ? $value : 'link';
     }
 
     private function isHttpUrl(string $url): bool
@@ -850,6 +958,19 @@ class LinkTreeController extends Controller
             'youtube-nocookie.com',
             'vimeo.com',
             'player.vimeo.com',
+        ], true);
+    }
+
+    private function isWhatsAppUrl(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $host = preg_replace('/^www\./', '', $host) ?? $host;
+
+        return in_array($host, [
+            'wa.me',
+            'api.whatsapp.com',
+            'whatsapp.com',
+            'chat.whatsapp.com',
         ], true);
     }
 

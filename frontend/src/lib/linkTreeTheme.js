@@ -96,6 +96,7 @@ export const AVATAR_SHAPES = [
 
 export const LINK_BLOCK_TYPES = [
   { id: "link", label: "Link", description: "Standard button link" },
+  { id: "custom", label: "Custom", description: "Link with a chosen icon" },
   { id: "video", label: "Video", description: "YouTube or Vimeo embed" },
   { id: "music", label: "Music", description: "Spotify / Apple Music link" },
   { id: "image", label: "Image", description: "Image with optional link" },
@@ -103,8 +104,21 @@ export const LINK_BLOCK_TYPES = [
   { id: "text", label: "Text", description: "Paragraph of copy" },
   { id: "email", label: "Email", description: "mailto: button" },
   { id: "phone", label: "Phone", description: "tel: button" },
+  { id: "whatsapp", label: "WhatsApp", description: "Chat on WhatsApp" },
+  { id: "maps", label: "Maps", description: "Directions / place pin" },
   { id: "divider", label: "Divider", description: "Visual separator" },
 ];
+
+/** Default title when adding a contact-style block (keeps drafts savable). */
+export const BLOCK_DEFAULT_TITLES = {
+  custom: "Custom link",
+  email: "Email",
+  phone: "Call",
+  whatsapp: "WhatsApp",
+  maps: "Directions",
+};
+
+export const CONTACT_BLOCK_TYPES = ["email", "phone", "whatsapp", "maps"];
 
 export const SOCIAL_PLATFORMS = [
   { id: "instagram", label: "Instagram", placeholder: "https://instagram.com/…" },
@@ -283,21 +297,29 @@ export function contrastTextOnAccent(hex) {
 
 export function newLinkItem(partial = {}) {
   const type = partial.type || "link";
+  const defaultTitle = BLOCK_DEFAULT_TITLES[type] || "";
   return {
     id: crypto.randomUUID?.() || `link-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type,
-    title: "",
+    title: defaultTitle,
     url: "",
     description: "",
     image_url: "",
+    icon: type === "custom" ? "link" : "",
     enabled: true,
     sort_order: 0,
     ...partial,
+    title: partial.title ?? defaultTitle,
+    icon: partial.icon ?? (type === "custom" ? "link" : partial.icon || ""),
   };
 }
 
 export function blockNeedsUrl(type) {
-  return ["link", "video", "music", "email", "phone"].includes(type);
+  return ["link", "custom", "video", "music", "email", "phone", "whatsapp", "maps"].includes(type);
+}
+
+export function isContactBlockType(type) {
+  return CONTACT_BLOCK_TYPES.includes(type);
 }
 
 export function blockIsVisibleInPreview(link) {
@@ -307,7 +329,7 @@ export function blockIsVisibleInPreview(link) {
   if (type === "header" || type === "text") return Boolean(link.title?.trim());
   if (type === "image") return Boolean(link.image_url?.trim() || link.url?.trim());
   if (type === "video" || type === "music") return Boolean(link.url?.trim());
-  if (type === "email" || type === "phone") {
+  if (isContactBlockType(type)) {
     return Boolean(link.title?.trim() && link.url?.trim());
   }
   return Boolean(link.title?.trim() && link.url?.trim());
@@ -385,6 +407,27 @@ export function normalizeHttpUrl(value) {
   return `https://${trimmed.replace(/^\/+/, "")}`;
 }
 
+/** Digits only (no +) for wa.me links. */
+export function digitsOnlyPhone(value) {
+  return String(value || "").replace(/[^\d]/g, "");
+}
+
+export function resolveWhatsAppHref(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return normalizeHttpUrl(value) || null;
+  const withoutTel = value.replace(/^tel:/i, "");
+  const digits = digitsOnlyPhone(withoutTel);
+  return digits ? `https://wa.me/${digits}` : null;
+}
+
+export function resolveMapsHref(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return normalizeHttpUrl(value) || null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value)}`;
+}
+
 export function resolveBlockHref(link) {
   const type = link?.type || "link";
   const value = String(link?.url || "").trim();
@@ -397,6 +440,12 @@ export function resolveBlockHref(link) {
   if (type === "phone") {
     const digits = value.replace(/[^\d+]/g, "");
     return digits ? `tel:${digits}` : null;
+  }
+  if (type === "whatsapp") {
+    return resolveWhatsAppHref(value);
+  }
+  if (type === "maps") {
+    return resolveMapsHref(value);
   }
   return normalizeHttpUrl(value) || null;
 }

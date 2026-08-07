@@ -12,6 +12,8 @@ import {
   Phone,
   ExternalLink,
   Play,
+  MapPin,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +30,7 @@ import {
   resolveBlockHref,
   treeSurfaceClasses,
 } from "@/lib/linkTreeTheme";
+import { getCustomBlockIcon } from "@/lib/linkTreeIcons";
 
 const SOCIAL_ICONS = {
   instagram: Instagram,
@@ -247,6 +250,20 @@ export function LinkTreeBlock({ link, theme, compact = false, onTrack }) {
   if (type === "music") return <MusicBlock link={link} theme={theme} compact={compact} onTrack={onTrack} />;
   if (type === "image") return <ImageBlock link={link} theme={theme} compact={compact} onTrack={onTrack} />;
 
+  if (type === "custom") {
+    return (
+      <BlockButton
+        theme={theme}
+        href={resolveBlockHref(link)}
+        compact={compact}
+        icon={getCustomBlockIcon(link.icon)}
+        onTrack={() => onTrack?.(link)}
+      >
+        {link.title}
+      </BlockButton>
+    );
+  }
+
   if (type === "email") {
     return (
       <BlockButton
@@ -268,6 +285,34 @@ export function LinkTreeBlock({ link, theme, compact = false, onTrack }) {
         href={resolveBlockHref(link)}
         compact={compact}
         icon={Phone}
+        onTrack={() => onTrack?.(link)}
+      >
+        {link.title}
+      </BlockButton>
+    );
+  }
+
+  if (type === "whatsapp") {
+    return (
+      <BlockButton
+        theme={theme}
+        href={resolveBlockHref(link)}
+        compact={compact}
+        icon={MessageCircle}
+        onTrack={() => onTrack?.(link)}
+      >
+        {link.title}
+      </BlockButton>
+    );
+  }
+
+  if (type === "maps") {
+    return (
+      <BlockButton
+        theme={theme}
+        href={resolveBlockHref(link)}
+        compact={compact}
+        icon={MapPin}
         onTrack={() => onTrack?.(link)}
       >
         {link.title}
