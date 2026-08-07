@@ -117,8 +117,31 @@ export const SOCIAL_PLATFORMS = [
   { id: "website", label: "Website", placeholder: "https://…" },
 ];
 
+export const BACKGROUND_FITS = [
+  { id: "cover", label: "Cover", description: "Fill the frame, crop edges" },
+  { id: "contain", label: "Fit", description: "Show full image" },
+  { id: "fill", label: "Stretch", description: "Stretch to fill" },
+];
+
+export const BACKGROUND_POSITIONS = [
+  { id: "top-left", label: "Top left", value: "left top" },
+  { id: "top", label: "Top", value: "center top" },
+  { id: "top-right", label: "Top right", value: "right top" },
+  { id: "left", label: "Left", value: "left center" },
+  { id: "center", label: "Center", value: "center center" },
+  { id: "right", label: "Right", value: "right center" },
+  { id: "bottom-left", label: "Bottom left", value: "left bottom" },
+  { id: "bottom", label: "Bottom", value: "center bottom" },
+  { id: "bottom-right", label: "Bottom right", value: "right bottom" },
+];
+
 export const DEFAULT_THEME = {
   background_preset: "slate",
+  background_image_url: "",
+  background_fit: "cover",
+  background_position: "center",
+  background_zoom: 100,
+  overlay_opacity: 45,
   button_style: "solid",
   button_radius: "rounded",
   font_style: "sans",
@@ -131,8 +154,68 @@ export function getBackgroundPreset(id) {
   return BACKGROUND_PRESETS.find((p) => p.id === id) || BACKGROUND_PRESETS[0];
 }
 
+export function clampOverlayOpacity(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_THEME.overlay_opacity;
+  return Math.min(100, Math.max(0, Math.round(n)));
+}
+
+export function clampBackgroundZoom(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_THEME.background_zoom;
+  return Math.min(200, Math.max(100, Math.round(n)));
+}
+
+export function getBackgroundFit(id) {
+  return BACKGROUND_FITS.find((f) => f.id === id) || BACKGROUND_FITS[0];
+}
+
+export function getBackgroundPosition(id) {
+  return BACKGROUND_POSITIONS.find((p) => p.id === id) || BACKGROUND_POSITIONS[4];
+}
+
+/** CSS for the tree background image layer (or null when no image). */
+export function getBackgroundImageStyle(theme) {
+  const url = String(theme?.background_image_url || "").trim();
+  if (!url) return null;
+
+  const fit = getBackgroundFit(theme?.background_fit);
+  const position = getBackgroundPosition(theme?.background_position);
+  const zoom = clampBackgroundZoom(theme?.background_zoom);
+
+  let backgroundSize = "cover";
+  if (fit.id === "contain") {
+    backgroundSize = "contain";
+  } else if (fit.id === "fill") {
+    backgroundSize = "100% 100%";
+  } else if (zoom > 100) {
+    backgroundSize = `${zoom}%`;
+  }
+
+  return {
+    backgroundImage: `url(${url})`,
+    backgroundSize,
+    backgroundPosition: position.value,
+    backgroundRepeat: "no-repeat",
+  };
+}
+
+export function hasBackgroundImage(theme) {
+  return Boolean(String(theme?.background_image_url || "").trim());
+}
+
 export function isDarkTheme(theme) {
-  return Boolean(getBackgroundPreset(theme?.background_preset)?.dark);
+  const preset = getBackgroundPreset(theme?.background_preset);
+  const hasImage = hasBackgroundImage(theme);
+  const opacity = clampOverlayOpacity(theme?.overlay_opacity);
+
+  if (hasImage) {
+    // Strong preset overlay → follow preset contrast; bare photo → light text.
+    if (opacity >= 20) return Boolean(preset.dark);
+    return true;
+  }
+
+  return Boolean(preset.dark);
 }
 
 export function getFontClass(fontStyle) {
@@ -176,8 +259,8 @@ export function treeSurfaceClasses(theme) {
     subtle: dark ? "text-white/50" : "text-slate-500",
     divider: dark ? "bg-white/25" : "bg-slate-900/15",
     social: dark
-      ? "bg-white/12 text-white hover:bg-white/20"
-      : "bg-slate-900/5 text-slate-800 hover:bg-slate-900/10",
+      ? "border border-white/35 bg-white/15 text-white hover:bg-white/25 hover:border-white/50"
+      : "border border-slate-900/15 bg-slate-900/5 text-slate-800 hover:bg-slate-900/10 hover:border-slate-900/25",
     avatarBorder: dark ? "border-white/35" : "border-white/70",
     avatarFallback: dark ? "bg-white/15 text-white" : "bg-white text-slate-800",
     videoFallback: dark

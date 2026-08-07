@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DEFAULT_THEME,
   getAvatarShapeClass,
+  getBackgroundImageStyle,
   getBackgroundPreset,
   getFontClass,
   getMusicEmbedUrl,
@@ -401,6 +402,10 @@ export function LinkTreeContent({
   const fontClass = getFontClass(merged.font_style);
   const surface = treeSurfaceClasses(merged);
   const dark = isDarkTheme(merged);
+  const backgroundImageUrl = String(merged.background_image_url || "").trim();
+  const overlayOpacity = Math.min(100, Math.max(0, Number(merged.overlay_opacity) || 0));
+  const showPresetOverlay = Boolean(backgroundImageUrl) && overlayOpacity > 0;
+  const backgroundImageStyle = getBackgroundImageStyle(merged);
   const visibleLinks = (links || []).filter((l) => {
     if (l?.enabled === false) return false;
     const type = l.type || "link";
@@ -434,15 +439,26 @@ export function LinkTreeContent({
   return (
     <div
       className={cn(
-        "min-h-full flex flex-col link-tree-surface",
-        preset.className,
+        "relative min-h-full flex flex-col link-tree-surface overflow-hidden",
+        !backgroundImageUrl && preset.className,
+        backgroundImageUrl && (dark ? "text-zinc-50" : "text-slate-900"),
         fontClass,
         className
       )}
       data-tree-theme={dark ? "dark" : "light"}
-      style={{ colorScheme: dark ? "dark" : "light" }}
+      style={{
+        colorScheme: dark ? "dark" : "light",
+        ...(backgroundImageStyle || null),
+      }}
     >
-      <div className={cn("flex-1 flex flex-col items-center", compact ? "px-4 pt-4 pb-10" : "px-4 py-12 sm:py-16")}>
+      {showPresetOverlay ? (
+        <div
+          className={cn("pointer-events-none absolute inset-0 z-0", preset.className)}
+          style={{ opacity: overlayOpacity / 100 }}
+          aria-hidden
+        />
+      ) : null}
+      <div className={cn("relative z-10 flex-1 flex flex-col items-center", compact ? "px-4 pt-4 pb-10" : "px-4 py-12 sm:py-16")}>
         <div className={cn("w-full flex flex-col items-center", compact ? "max-w-none" : "max-w-md")}>
           <LinkTreeProfile
             title={title}
@@ -478,7 +494,7 @@ export function LinkTreeContent({
           </div>
         </div>
       </div>
-      {footer}
+      {footer ? <div className="relative z-10">{footer}</div> : null}
     </div>
   );
 }

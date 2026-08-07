@@ -67,6 +67,24 @@ class LinkTreeController extends Controller
         'rounded',
     ];
 
+    private const BACKGROUND_FITS = [
+        'cover',
+        'contain',
+        'fill',
+    ];
+
+    private const BACKGROUND_POSITIONS = [
+        'top-left',
+        'top',
+        'top-right',
+        'left',
+        'center',
+        'right',
+        'bottom-left',
+        'bottom',
+        'bottom-right',
+    ];
+
     private const LINK_TYPES = [
         'link',
         'video',
@@ -562,12 +580,42 @@ class LinkTreeController extends Controller
             return $this->error('invalid_theme', 'Accent color must be a hex value like #0f766e', 422);
         }
 
+        $backgroundImage = trim((string) ($theme['background_image_url'] ?? ''));
+        if ($backgroundImage !== '' && ! $this->isHttpUrl($backgroundImage)) {
+            return $this->error('invalid_theme', 'Background image must be a valid http(s) URL', 422);
+        }
+
+        $backgroundFit = (string) ($theme['background_fit'] ?? 'cover');
+        if (! in_array($backgroundFit, self::BACKGROUND_FITS, true)) {
+            return $this->error('invalid_theme', 'Invalid background image fit', 422);
+        }
+
+        $backgroundPosition = (string) ($theme['background_position'] ?? 'center');
+        if (! in_array($backgroundPosition, self::BACKGROUND_POSITIONS, true)) {
+            return $this->error('invalid_theme', 'Invalid background image position', 422);
+        }
+
+        $backgroundZoom = (int) ($theme['background_zoom'] ?? 100);
+        if ($backgroundZoom < 100 || $backgroundZoom > 200) {
+            return $this->error('invalid_theme', 'Background zoom must be between 100 and 200', 422);
+        }
+
+        $overlayOpacity = (int) ($theme['overlay_opacity'] ?? 45);
+        if ($overlayOpacity < 0 || $overlayOpacity > 100) {
+            return $this->error('invalid_theme', 'Overlay opacity must be between 0 and 100', 422);
+        }
+
         $showBranding = array_key_exists('show_branding', $theme)
             ? (bool) $theme['show_branding']
             : true;
 
         return [
             'background_preset' => $preset,
+            'background_image_url' => $backgroundImage,
+            'background_fit' => $backgroundFit,
+            'background_position' => $backgroundPosition,
+            'background_zoom' => $backgroundZoom,
+            'overlay_opacity' => $overlayOpacity,
             'button_style' => $buttonStyle,
             'button_radius' => $buttonRadius,
             'font_style' => $fontStyle,
@@ -809,6 +857,11 @@ class LinkTreeController extends Controller
     {
         return [
             'background_preset' => 'slate',
+            'background_image_url' => '',
+            'background_fit' => 'cover',
+            'background_position' => 'center',
+            'background_zoom' => 100,
+            'overlay_opacity' => 45,
             'button_style' => 'solid',
             'button_radius' => 'rounded',
             'font_style' => 'sans',

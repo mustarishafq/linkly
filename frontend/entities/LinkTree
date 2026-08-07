@@ -35,6 +35,36 @@
           "enum": ["slate", "ocean", "forest", "sunset", "midnight", "sand", "bloom", "aurora", "paper", "ember"],
           "default": "slate"
         },
+        "background_image_url": {
+          "type": "string",
+          "description": "Optional full-bleed background image URL"
+        },
+        "background_fit": {
+          "type": "string",
+          "enum": ["cover", "contain", "fill"],
+          "default": "cover",
+          "description": "How the image fills the page frame"
+        },
+        "background_position": {
+          "type": "string",
+          "enum": ["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"],
+          "default": "center",
+          "description": "Focal point of the background image within the frame"
+        },
+        "background_zoom": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 200,
+          "default": 100,
+          "description": "Zoom percent when fit is cover"
+        },
+        "overlay_opacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 45,
+          "description": "How strongly the selected background preset overlays the image (0 = image only, 100 = full preset)"
+        },
         "button_style": {
           "type": "string",
           "enum": ["solid", "outline", "soft", "glass"],

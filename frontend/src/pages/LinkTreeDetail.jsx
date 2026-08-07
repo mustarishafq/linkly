@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Slider } from "@/components/ui/slider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,6 +46,8 @@ import { summarizeLinkTreeClicks } from "@/lib/linkTreeAnalytics";
 import StatCard from "@/components/ui/StatCard";
 import {
   AVATAR_SHAPES,
+  BACKGROUND_FITS,
+  BACKGROUND_POSITIONS,
   BACKGROUND_PRESETS,
   BUTTON_RADII,
   BUTTON_STYLES,
@@ -52,7 +55,11 @@ import {
   FONT_STYLES,
   LINK_BLOCK_TYPES,
   SOCIAL_PLATFORMS,
+  clampBackgroundZoom,
+  clampOverlayOpacity,
   getAvatarShapeClass,
+  getBackgroundImageStyle,
+  getBackgroundPreset,
   getBlockType,
   isDarkTheme,
   newLinkItem,
@@ -458,6 +465,34 @@ export default function LinkTreeDetail() {
     }
   }
 
+  async function handleBackgroundUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await db.uploads.logo(file);
+      const url = result?.file_url || "";
+      setTheme((t) => ({
+        ...t,
+        background_image_url: url,
+        overlay_opacity:
+          clampOverlayOpacity(t.overlay_opacity) === 0
+            ? DEFAULT_THEME.overlay_opacity
+            : clampOverlayOpacity(t.overlay_opacity),
+      }));
+      toast({ title: "Background image uploaded" });
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error?.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
   async function save(nextStatus = status) {
     setSaving(true);
     try {
@@ -467,7 +502,17 @@ export default function LinkTreeDetail() {
         bio: bio.trim(),
         avatar_url: avatarUrl || null,
         status: nextStatus,
-        theme,
+        theme: {
+          ...theme,
+          background_image_url:
+            normalizeHttpUrl(theme.background_image_url) ||
+            theme.background_image_url?.trim() ||
+            "",
+          background_fit: theme.background_fit || DEFAULT_THEME.background_fit,
+          background_position: theme.background_position || DEFAULT_THEME.background_position,
+          background_zoom: clampBackgroundZoom(theme.background_zoom),
+          overlay_opacity: clampOverlayOpacity(theme.overlay_opacity),
+        },
         socials: socialsForSave(),
         links: links.map((l, i) => ({
           ...l,
@@ -767,6 +812,163 @@ export default function LinkTreeDetail() {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {theme.background_image_url
+                    ? "Selected preset overlays your image. Adjust transparency below."
+                    : "Preset is the full background. Add an image to use it as an overlay."}
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                <h3 className="text-sm font-semibold">Background image</h3>
+                {theme.background_image_url ? (
+                  <div
+                    className="relative h-28 rounded-xl border border-border overflow-hidden bg-muted"
+                    style={getBackgroundImageStyle(theme) || undefined}
+                  >
+                    <div
+                      className={cn(
+                        "absolute inset-0",
+                        getBackgroundPreset(theme.background_preset).className
+                      )}
+                      style={{ opacity: clampOverlayOpacity(theme.overlay_opacity) / 100 }}
+                    />
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="bg-image-upload" className="cursor-pointer">
+                    <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-secondary text-xs font-medium hover:bg-secondary/80">
+                      <Upload className="h-3.5 w-3.5" />
+                      {uploading ? "Uploading…" : "Upload image"}
+                    </span>
+                  </Label>
+                  <Input
+                    id="bg-image-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleBackgroundUpload}
+                    disabled={uploading}
+                  />
+                  {theme.background_image_url ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 text-xs text-muted-foreground"
+                      onClick={() => setTheme((t) => ({ ...t, background_image_url: "" }))}
+                    >
+                      Remove image
+                    </Button>
+                  ) : null}
+                </div>
+                <Field label="Image URL">
+                  <Input
+                    value={theme.background_image_url || ""}
+                    onChange={(e) =>
+                      setTheme((t) => ({ ...t, background_image_url: e.target.value }))
+                    }
+                    placeholder="https://…"
+                  />
+                </Field>
+                {theme.background_image_url ? (
+                  <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Image frame</p>
+                      <p className="text-xs text-muted-foreground">
+                        How the image fills the page and which part stays in view
+                      </p>
+                      <SegmentedControl
+                        options={BACKGROUND_FITS}
+                        value={theme.background_fit || DEFAULT_THEME.background_fit}
+                        onChange={(id) => setTheme((t) => ({ ...t, background_fit: id }))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">Focus</p>
+                        <span className="text-[10px] text-muted-foreground capitalize">
+                          {(theme.background_position || "center").replace("-", " ")}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5 max-w-[132px]">
+                        {BACKGROUND_POSITIONS.map((pos) => (
+                          <button
+                            key={pos.id}
+                            type="button"
+                            title={pos.label}
+                            aria-label={pos.label}
+                            onClick={() => setTheme((t) => ({ ...t, background_position: pos.id }))}
+                            className={cn(
+                              "h-8 w-8 rounded-md border transition-all",
+                              (theme.background_position || "center") === pos.id
+                                ? "border-primary bg-primary/15 ring-2 ring-primary/30"
+                                : "border-border bg-card hover:border-muted-foreground/40"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {(theme.background_fit || "cover") === "cover" ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">Zoom</p>
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {clampBackgroundZoom(theme.background_zoom)}%
+                          </span>
+                        </div>
+                        <Slider
+                          min={100}
+                          max={200}
+                          step={5}
+                          value={[clampBackgroundZoom(theme.background_zoom)]}
+                          onValueChange={([value]) =>
+                            setTheme((t) => ({
+                              ...t,
+                              background_zoom: clampBackgroundZoom(value),
+                            }))
+                          }
+                          aria-label="Background image zoom"
+                        />
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-2 border-t border-border pt-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium">Preset overlay</p>
+                          <p className="text-xs text-muted-foreground">
+                            How strongly the selected background covers the image
+                          </p>
+                        </div>
+                        <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                          {100 - clampOverlayOpacity(theme.overlay_opacity)}% clear
+                        </span>
+                      </div>
+                      <Slider
+                        id="overlay-opacity"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={[clampOverlayOpacity(theme.overlay_opacity)]}
+                        onValueChange={([value]) =>
+                          setTheme((t) => ({ ...t, overlay_opacity: clampOverlayOpacity(value) }))
+                        }
+                        aria-label="Preset overlay transparency"
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>See image</span>
+                        <span className="tabular-nums">
+                          {clampOverlayOpacity(theme.overlay_opacity)}% overlay
+                        </span>
+                        <span>Full preset</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2.5">

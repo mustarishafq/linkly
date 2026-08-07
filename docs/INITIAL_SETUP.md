@@ -755,7 +755,7 @@ API: `GET` / `PATCH /api/settings` (admin JWT required). Secrets are redacted on
 | **Dashboard / Links** | CRUD for `ShortLink` entities |
 | **Public route** | `/r/:slug` — `RedirectPage.jsx` resolves slug and redirects (no login required) |
 | **Campaigns** | Group links under `Campaign` entities |
-| **Link Trees** | Multi-link public pages (`LinkTree`) at `/t/:slug`; users own multiple trees. Blocks: link, video (YouTube/Vimeo), music (Spotify), image, header, text, email, phone, divider. Theme: 10 backgrounds, button style/shape, font, avatar shape, social icons. Analytics: page views + per-block clicks via `POST /api/link-trees/public/{slug}/events` → `ClickLog` (`link_tree_id`, `event`). API: `/api/link-trees` (auth + ownership), `GET /api/link-trees/public/{slug}` |
+| **Link Trees** | Multi-link public pages (`LinkTree`) at `/t/:slug`; users own multiple trees. Blocks: link, video (YouTube/Vimeo), music (Spotify), image, header, text, email, phone, divider. Theme: 10 backgrounds, optional background image (fit/focus/zoom + preset overlay), button style/shape, font, avatar shape, social icons. Analytics: page views + per-block clicks via `POST /api/link-trees/public/{slug}/events` → `ClickLog` (`link_tree_id`, `event`). API: `/api/link-trees` (auth + ownership), `GET /api/link-trees/public/{slug}` |
 | **A/B testing** | `ABVariant` entities + AB Testing page |
 | **Smart redirects** | `RedirectRule` entities (geo, device, time rules) |
 | **Analytics** | Click logs, charts, referrer/device breakdowns |
