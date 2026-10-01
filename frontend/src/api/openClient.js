@@ -73,19 +73,20 @@ async function readJsonResponse(response, url) {
  * @param {RequestInit} [options]
  */
 async function request(path, options = {}) {
+  const { anonymous = false, ...fetchOptions } = options;
   const token = getToken();
-  const headers = new Headers(options.headers || {});
+  const headers = new Headers(fetchOptions.headers || {});
   headers.set("Content-Type", "application/json");
   headers.set("Accept", "application/json");
 
-  if (token) {
+  if (token && !anonymous) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
   const url = buildApiUrl(path);
   const response = await fetch(url, {
     headers,
-    ...options,
+    ...fetchOptions,
   });
 
   if (!response.ok) {
@@ -154,12 +155,15 @@ async function uploadRequest(path, formData) {
   return readJsonResponse(response, url);
 }
 
-/** @param {string} entityName */
-function createEntityApi(entityName) {
+/** @param {string} entityName @param {{ anonymous?: boolean }} [options] */
+function createEntityApi(entityName, options = {}) {
+  const anonymous = Boolean(options.anonymous);
+
   return {
     async list(sortBy = "-created_date", limit = 200) {
       return request(`/entities/${entityName}/list`, {
         method: "POST",
+        anonymous,
         body: JSON.stringify({ sortBy, limit }),
       });
     },
@@ -167,19 +171,21 @@ function createEntityApi(entityName) {
     async filter(where = {}, sortBy = "-created_date", limit = 200) {
       return request(`/entities/${entityName}/filter`, {
         method: "POST",
+        anonymous,
         body: JSON.stringify({ where, sortBy, limit }),
       });
     },
 
     /** @param {string} id */
     async get(id) {
-      return request(`/entities/${entityName}/${id}`);
+      return request(`/entities/${entityName}/${id}`, { anonymous });
     },
 
     /** @param {Record<string, any>} data */
     async create(data) {
       return request(`/entities/${entityName}`, {
         method: "POST",
+        anonymous,
         body: JSON.stringify(data || {}),
       });
     },
@@ -188,6 +194,7 @@ function createEntityApi(entityName) {
     async bulkCreate(items = []) {
       return request(`/entities/${entityName}/bulk`, {
         method: "POST",
+        anonymous,
         body: JSON.stringify({ items: Array.isArray(items) ? items : [] }),
       });
     },
@@ -196,6 +203,7 @@ function createEntityApi(entityName) {
     async update(id, patch) {
       return request(`/entities/${entityName}/${id}`, {
         method: "PATCH",
+        anonymous,
         body: JSON.stringify(patch || {}),
       });
     },
@@ -204,23 +212,25 @@ function createEntityApi(entityName) {
     async delete(id) {
       return request(`/entities/${entityName}/${id}`, {
         method: "DELETE",
+        anonymous,
       });
     },
   };
 }
 
-const entities = new Proxy(
-  {},
-  {
-    get: (_, entityName) => {
-      const normalizedName = String(entityName);
-      if (!ENTITY_NAMES.includes(normalizedName)) {
-        return createEntityApi(normalizedName);
-      }
-      return createEntityApi(normalizedName);
-    },
-  }
-);
+function entityProxy(anonymous = false) {
+  return new Proxy(
+    {},
+    {
+      get: (_, entityName) => createEntityApi(String(entityName), { anonymous }),
+    }
+  );
+}
+
+const entities = entityProxy(false);
+
+/** Public redirect traffic. Omits the logged-in token so another user's link can still resolve. */
+const publicEntities = entityProxy(true);
 
 const auth = {
   async isAuthenticated() {
@@ -483,5 +493,5 @@ const users = {
 
 const db = { auth, entities, integrations, admin, domains, linkTrees, settings, uploads, users, notifications };
 
-export { db };
+export { db, publicEntities };
 export default db;

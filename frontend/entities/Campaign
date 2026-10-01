@@ -38,6 +38,10 @@
     "total_conversions": {
       "type": "number",
       "default": 0
+    },
+    "owner_user_id": {
+      "type": "integer",
+      "description": "User who owns this campaign. Set by the API. Role user can only read their own campaigns."
     }
   },
   "required": [

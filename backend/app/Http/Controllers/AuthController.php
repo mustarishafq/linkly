@@ -175,11 +175,19 @@ class AuthController extends Controller
         return response()->json($this->jwt->toSafeUser($user));
     }
 
-    public function userDirectory(): JsonResponse
+    public function userDirectory(Request $request): JsonResponse
     {
-        $users = DB::table('users')
+        $authUser = $request->attributes->get('auth_user');
+
+        $query = DB::table('users')
             ->select('id', 'email', 'full_name', 'role')
-            ->where('is_approved', true)
+            ->where('is_approved', true);
+
+        if (($authUser->role ?? '') !== 'admin') {
+            $query->where('id', $authUser->id);
+        }
+
+        $users = $query
             ->orderBy('full_name')
             ->get()
             ->map(fn ($user) => [

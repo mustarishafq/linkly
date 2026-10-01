@@ -294,36 +294,44 @@ export default function LinkDetail() {
   useEffect(() => {
     async function load() {
       const linkId = Number(id);
-      const [found, clickData, domainData, campaignData] = await Promise.all([
-        db.entities.ShortLink.get(id),
-        db.entities.ClickLog.filter({ link_id: linkId }, "-created_date", 500),
-        db.entities.CustomDomain.list(),
-        db.entities.Campaign.list(),
-      ]);
-      setLink(found);
-      setClicks(clickData);
+      try {
+        const [found, clickData, domainData, campaignData] = await Promise.all([
+          db.entities.ShortLink.get(id),
+          db.entities.ClickLog.filter({ link_id: linkId }, "-created_date", 500),
+          db.entities.CustomDomain.list(),
+          db.entities.Campaign.list(),
+        ]);
+        setLink(found);
+        setClicks(clickData);
 
-      if (found?.is_ab_test) {
-        const variantData = await db.entities.ABVariant.filter({ link_id: linkId });
-        setVariants(variantData);
-      } else {
-        setVariants([]);
+        if (found?.is_ab_test) {
+          const variantData = await db.entities.ABVariant.filter({ link_id: linkId });
+          setVariants(variantData);
+        } else {
+          setVariants([]);
+        }
+        setDomains(domainData);
+        setCampaigns(campaignData);
+
+        if (found?.campaign_id) {
+          setCampaign(campaignData.find((c) => String(c.id) === String(found.campaign_id)) || null);
+        }
+      } catch {
+        setLink(null);
+      } finally {
+        setLoading(false);
       }
-      setDomains(domainData);
-      setCampaigns(campaignData);
-
-      if (found?.campaign_id) {
-        setCampaign(campaignData.find((c) => String(c.id) === String(found.campaign_id)) || null);
-      }
-
-      setLoading(false);
     }
     load();
   }, [id]);
 
   async function reloadLink() {
-    const found = await db.entities.ShortLink.get(id);
-    setLink(found);
+    try {
+      const found = await db.entities.ShortLink.get(id);
+      setLink(found);
+    } catch {
+      setLink(null);
+    }
   }
 
   function handleCopy() {

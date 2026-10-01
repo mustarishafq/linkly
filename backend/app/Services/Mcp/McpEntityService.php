@@ -2,6 +2,7 @@
 
 namespace App\Services\Mcp;
 
+use App\Services\EntityAccessService;
 use App\Services\EntityService;
 
 class McpEntityService
@@ -13,7 +14,10 @@ class McpEntityService
         'CustomDomain' => ['domain'],
     ];
 
-    public function __construct(private EntityService $entities) {}
+    public function __construct(
+        private EntityService $entities,
+        private EntityAccessService $access,
+    ) {}
 
     public function list(
         string $entity,
@@ -22,6 +26,7 @@ class McpEntityService
         string $sortOrder = 'desc',
         int $page = 1,
         int $perPage = 50,
+        ?object $viewer = null,
     ): array {
         $table = $this->entities->tableFor($entity);
         if (! $table) {
@@ -29,20 +34,28 @@ class McpEntityService
         }
 
         $records = $this->entities->fetchAll($table);
+        if ($viewer && ! $this->access->isAdmin($viewer)) {
+            $records = $this->access->visibleRows($viewer, $entity, $records);
+        }
         $records = $this->filterSearch($records, $entity, $search);
         $records = $this->entities->sortRecords($records, $this->toSortBy($sortBy, $sortOrder));
 
         return $this->paginate($records, $page, $perPage);
     }
 
-    public function find(string $entity, string $id): ?array
+    public function find(string $entity, string $id, ?object $viewer = null): ?array
     {
         $table = $this->entities->tableFor($entity);
         if (! $table) {
             return null;
         }
 
-        return $this->entities->find($table, $id);
+        $record = $this->entities->find($table, $id);
+        if ($record && $viewer && ! $this->access->canRead($viewer, $entity, $record)) {
+            return null;
+        }
+
+        return $record;
     }
 
     public function create(string $entity, array $body, ?string $actorUserId): ?array

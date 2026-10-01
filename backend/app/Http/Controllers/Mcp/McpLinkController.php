@@ -9,6 +9,7 @@ use App\Services\LinkWebhookService;
 use App\Services\Mcp\McpEntityService;
 use App\Support\McpResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class McpLinkController extends McpController
 {
@@ -26,14 +27,15 @@ class McpLinkController extends McpController
             $request->input('sort_order', 'desc'),
             $this->page($request),
             $this->perPage($request),
+            $this->recordViewer($request),
         );
 
         return McpResponse::success($result['data'], $result['meta']);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $record = $this->entities->find('ShortLink', $id);
+        $record = $this->entities->find('ShortLink', $id, $this->recordViewer($request));
         if (! $record) {
             return McpResponse::error('Resource not found.', 404);
         }

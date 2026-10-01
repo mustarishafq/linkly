@@ -1,4 +1,6 @@
-import db from "@/api/openClient";
+import { publicEntities } from "@/api/openClient";
+
+const db = { entities: publicEntities };
 import { isLinkPreviewMode } from "@/lib/linkPreview";
 import { isReservedShortLinkSlug } from "@/lib/reservedPaths";
 import {

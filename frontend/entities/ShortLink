@@ -100,6 +100,10 @@
         "paused"
       ],
       "default": "active"
+    },
+    "owner_user_id": {
+      "type": "integer",
+      "description": "User who owns this link. Set by the API. Role user can only read their own links."
     }
   },
   "required": [

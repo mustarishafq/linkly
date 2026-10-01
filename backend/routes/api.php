@@ -96,15 +96,12 @@ Route::middleware([JwtAuth::class, AdminRequired::class])->group(function () {
 
 Route::post('/domains/{id}/verify', [DomainController::class, 'verify'])->middleware(JwtAuth::class);
 
-Route::prefix('entities/{entity}')->group(function () {
+Route::prefix('entities/{entity}')->middleware(OptionalJwtAuth::class)->group(function () {
     Route::post('/list', [EntityController::class, 'list']);
     Route::post('/filter', [EntityController::class, 'filter']);
     Route::get('/{id}', [EntityController::class, 'show']);
-
-    Route::middleware(OptionalJwtAuth::class)->group(function () {
-        Route::post('/', [EntityController::class, 'store']);
-        Route::post('/bulk', [EntityController::class, 'bulkStore']);
-        Route::patch('/{id}', [EntityController::class, 'update']);
-        Route::delete('/{id}', [EntityController::class, 'destroy']);
-    });
+    Route::post('/', [EntityController::class, 'store']);
+    Route::post('/bulk', [EntityController::class, 'bulkStore']);
+    Route::patch('/{id}', [EntityController::class, 'update']);
+    Route::delete('/{id}', [EntityController::class, 'destroy']);
 });

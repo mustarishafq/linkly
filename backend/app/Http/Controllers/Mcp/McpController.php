@@ -15,6 +15,19 @@ abstract class McpController extends Controller
         return $user?->id ? (string) $user->id : null;
     }
 
+    /**
+     * API-key clients act as the installation and can read every record.
+     * A signed-in user with role "user" only sees records they own.
+     */
+    protected function recordViewer(Request $request): ?object
+    {
+        if ($request->attributes->get('mcp_auth_mode') !== 'bearer') {
+            return null;
+        }
+
+        return $request->attributes->get('auth_user');
+    }
+
     protected function requireAdmin(Request $request): ?\Illuminate\Http\JsonResponse
     {
         if ($request->attributes->get('mcp_auth_mode') === 'api_key') {

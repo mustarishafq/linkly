@@ -38,8 +38,7 @@ class DomainController extends Controller
 
         if (
             $user->role !== 'admin'
-            && ! empty($payload['owner_user_id'])
-            && (string) $payload['owner_user_id'] !== (string) $user->id
+            && (string) ($payload['owner_user_id'] ?? '') !== (string) $user->id
         ) {
             return $this->error('forbidden', 'You cannot verify this domain', 403);
         }
