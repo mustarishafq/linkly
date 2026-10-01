@@ -1,0 +1,130 @@
+.custom-redirect-content p {
+  margin: 0.4em 0;
+}
+
+.custom-redirect-content h1,
+.custom-redirect-content h2,
+.custom-redirect-content h3 {
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0.4em 0;
+}
+
+.custom-redirect-content h1 {
+  font-size: 1.5rem;
+}
+
+.custom-redirect-content h2 {
+  font-size: 1.25rem;
+}
+
+.custom-redirect-content h3 {
+  font-size: 1.05rem;
+}
+
+.custom-redirect-content ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.4em 0;
+  text-align: left;
+}
+
+.custom-redirect-content ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.4em 0;
+  text-align: left;
+}
+
+.custom-redirect-content a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}
+
+.custom-redirect-html {
+  margin-top: 0.75rem;
+  text-align: initial;
+}
+
+.custom-redirect-html img,
+.custom-redirect-content img,
+.custom-redirect-editor .ql-editor img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.6em auto;
+  border-radius: 0.75rem;
+  background: hsl(var(--muted));
+}
+
+.custom-redirect-content blockquote {
+  border-left: 3px solid hsl(var(--border));
+  margin: 0.5em 0;
+  padding-left: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.ql-align-center {
+  text-align: center;
+}
+
+.ql-align-right {
+  text-align: right;
+}
+
+.ql-align-justify {
+  text-align: justify;
+}
+
+.custom-redirect-editor .ql-toolbar.ql-snow,
+.custom-redirect-editor .ql-container.ql-snow {
+  border-color: hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: inherit;
+}
+
+.custom-redirect-editor .ql-toolbar.ql-snow {
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.custom-redirect-editor .ql-container.ql-snow {
+  border-radius: 0 0 0.75rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.custom-redirect-editor .ql-editor {
+  min-height: 220px;
+  color: hsl(var(--foreground));
+}
+
+.custom-redirect-editor .ql-editor.ql-blank::before {
+  color: hsl(var(--muted-foreground));
+  font-style: normal;
+}
+
+.custom-redirect-editor .ql-snow .ql-stroke {
+  stroke: hsl(var(--foreground));
+}
+
+.custom-redirect-editor .ql-snow .ql-fill {
+  fill: hsl(var(--foreground));
+}
+
+.custom-redirect-editor .ql-snow .ql-picker {
+  color: hsl(var(--foreground));
+}
+
+.custom-redirect-editor .ql-snow .ql-picker-options {
+  background: hsl(var(--popover));
+  border-color: hsl(var(--border));
+  color: hsl(var(--popover-foreground));
+}
+
+.custom-redirect-editor .ql-snow.ql-toolbar button:hover,
+.custom-redirect-editor .ql-snow .ql-toolbar button:hover,
+.custom-redirect-editor .ql-snow.ql-toolbar button.ql-active,
+.custom-redirect-editor .ql-snow .ql-toolbar button.ql-active {
+  background: hsl(var(--secondary));
+  border-radius: 0.375rem;
+}

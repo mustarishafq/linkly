@@ -1,13 +1,23 @@
 import db from "@/api/openClient";
 import { isLinkPreviewMode } from "@/lib/linkPreview";
 import { isReservedShortLinkSlug } from "@/lib/reservedPaths";
+import {
+  destinationLabel,
+  formatRedirectCountdownText,
+  isRedirectHtmlEmpty,
+  normalizeCustomRedirect,
+  sanitizeRedirectHtml,
+} from "@/lib/customRedirect";
+import { cn } from "@/lib/utils";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { detectBrowser, detectDevice, detectPlatform, detectReferrerSource } from "@/lib/clickContext";
+import "@/components/links/custom-redirect.css";
 
 function normalizeHost(value) {
   const raw = String(value || "").trim().toLowerCase();
@@ -21,6 +31,36 @@ function normalizeHost(value) {
 }
 
 const PREVIEW_COUNTDOWN_SECONDS = 5;
+const IMAGE_READY_TIMEOUT_MS = 4000;
+
+function imageSourcesFromHtml(html) {
+  const value = String(html || "").trim();
+  if (!value || typeof DOMParser === "undefined") return [];
+  const doc = new DOMParser().parseFromString(value, "text/html");
+  return [...doc.querySelectorAll("img")]
+    .map((img) => String(img.getAttribute("src") || "").trim())
+    .filter((src) => /^https?:\/\//i.test(src) || (src.startsWith("/") && !src.startsWith("//")));
+}
+
+function whenImageReady(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const done = () => resolve();
+    img.onload = done;
+    img.onerror = done;
+    img.src = src;
+    if (img.complete) done();
+  });
+}
+
+async function waitForRedirectImages(html, markup) {
+  const sources = [...new Set([...imageSourcesFromHtml(html), ...imageSourcesFromHtml(markup)])];
+  if (sources.length === 0) return;
+  await Promise.race([
+    Promise.all(sources.map(whenImageReady)),
+    new Promise((resolve) => window.setTimeout(resolve, IMAGE_READY_TIMEOUT_MS)),
+  ]);
+}
 
 export default function RedirectPage() {
   const { slug } = useParams();
@@ -28,6 +68,8 @@ export default function RedirectPage() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewVariant, setPreviewVariant] = useState(null);
   const [previewCountdown, setPreviewCountdown] = useState(PREVIEW_COUNTDOWN_SECONDS);
+  const [countdownTotal, setCountdownTotal] = useState(PREVIEW_COUNTDOWN_SECONDS);
+  const [customPage, setCustomPage] = useState(null);
   const countdownIntervalRef = useRef(null);
   const isPreview = isLinkPreviewMode();
 
@@ -41,9 +83,9 @@ export default function RedirectPage() {
   }
 
   useEffect(() => {
-    if (status !== "preview" || !previewUrl) return;
+    if ((status !== "preview" && status !== "custom") || !previewUrl) return;
 
-    setPreviewCountdown(PREVIEW_COUNTDOWN_SECONDS);
+    setPreviewCountdown(countdownTotal);
 
     countdownIntervalRef.current = window.setInterval(() => {
       setPreviewCountdown((current) => {
@@ -65,9 +107,11 @@ export default function RedirectPage() {
         countdownIntervalRef.current = null;
       }
     };
-  }, [status, previewUrl]);
+  }, [status, previewUrl, countdownTotal]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function handleRedirect() {
       if (isReservedShortLinkSlug(slug)) {
         setStatus("not_found");
@@ -172,23 +216,38 @@ export default function RedirectPage() {
         ab_variant: abVariant,
       };
 
-      await db.entities.ClickLog.create(clickPayload);
+      async function recordClick() {
+        await db.entities.ClickLog.create(clickPayload);
+        if (!isPreview) {
+          await db.entities.ShortLink.update(link.id, {
+            total_clicks: (link.total_clicks || 0) + 1,
+          });
+        }
+      }
 
-      if (!isPreview) {
-        await db.entities.ShortLink.update(link.id, {
-          total_clicks: (link.total_clicks || 0) + 1,
-        });
-
-        window.location.href = redirectUrl;
+      const page = normalizeCustomRedirect(link);
+      if (isPreview || page.enabled) {
+        void recordClick().catch(() => {});
+        if (page.enabled) {
+          await waitForRedirectImages(page.html, page.markup);
+        }
+        if (cancelled) return;
+        setPreviewUrl(redirectUrl);
+        setPreviewVariant(abVariant);
+        setCustomPage(page.enabled ? page : null);
+        setCountdownTotal(page.enabled ? page.delay : PREVIEW_COUNTDOWN_SECONDS);
+        setStatus(page.enabled ? "custom" : "preview");
         return;
       }
 
-      setPreviewUrl(redirectUrl);
-      setPreviewVariant(abVariant);
-      setStatus("preview");
+      await recordClick();
+      if (!cancelled) window.location.href = redirectUrl;
     }
 
     handleRedirect();
+    return () => {
+      cancelled = true;
+    };
   }, [slug, isPreview]);
 
   if (status === "not_found") {
@@ -210,6 +269,19 @@ export default function RedirectPage() {
           <p className="text-muted-foreground mt-2">This link is no longer active</p>
         </div>
       </div>
+    );
+  }
+
+  if (status === "custom" && previewUrl && customPage) {
+    return (
+      <CustomRedirectView
+        page={customPage}
+        destinationUrl={previewUrl}
+        countdown={previewCountdown}
+        isPreview={isPreview}
+        variant={previewVariant}
+        onContinue={() => continueToDestination()}
+      />
     );
   }
 
@@ -261,14 +333,119 @@ export default function RedirectPage() {
     );
   }
 
+  return <RedirectPending />;
+}
+
+function RedirectPending() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4">
-          <Zap className="h-5 w-5 text-primary-foreground" />
-        </div>
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-sm text-muted-foreground mt-4">Redirecting...</p>
+    <div
+      className="min-h-screen flex items-center justify-center bg-background p-4"
+      aria-busy="true"
+    >
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+        <span className="sr-only">Loading</span>
+        <Skeleton className="h-56 w-full rounded-xl" />
+        <Skeleton className="mx-auto mt-4 h-4 w-4/5" />
+        <Skeleton className="mx-auto mt-2 h-4 w-3/5" />
+        <Skeleton className="mx-auto mt-6 h-10 w-10" />
+        <Skeleton className="mx-auto mt-2 h-3 w-24" />
+        <Skeleton className="mx-auto mt-5 h-10 w-28" />
+      </div>
+    </div>
+  );
+}
+
+function CountdownLine({ text, seconds }) {
+  const line = formatRedirectCountdownText(text, seconds);
+
+  return (
+    <div className="mt-5 flex flex-col items-center gap-1">
+      <span className="text-4xl font-bold tabular-nums text-primary leading-none">
+        {seconds}
+      </span>
+      {line ? <span className="text-xs text-muted-foreground">{line}</span> : null}
+    </div>
+  );
+}
+
+function CustomRedirectView({ page, destinationUrl, countdown, isPreview, variant, onContinue }) {
+  const markupRef = useRef(null);
+  const safeHtml = useMemo(() => sanitizeRedirectHtml(page.html), [page.html]);
+  const markup = String(page.markup || "").trim();
+  const hasContent = !isRedirectHtmlEmpty(safeHtml);
+  const host = destinationLabel(destinationUrl);
+
+  useEffect(() => {
+    const container = markupRef.current;
+    if (!container) return undefined;
+    container.innerHTML = markup;
+    container.querySelectorAll("script").forEach((oldScript) => {
+      const script = document.createElement("script");
+      [...oldScript.attributes].forEach((attr) => {
+        script.setAttribute(attr.name, attr.value);
+      });
+      script.text = oldScript.textContent || "";
+      oldScript.replaceWith(script);
+    });
+    return () => {
+      container.innerHTML = "";
+    };
+  }, [markup]);
+
+  useEffect(() => {
+    const css = String(page.css || "").trim();
+    if (!css) return undefined;
+    const style = document.createElement("style");
+    style.setAttribute("data-custom-redirect", "css");
+    style.textContent = css;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, [page.css]);
+
+  useEffect(() => {
+    const source = String(page.js || "").trim();
+    if (!source) return undefined;
+    const script = document.createElement("script");
+    script.setAttribute("data-custom-redirect", "js");
+    script.text = source;
+    document.body.appendChild(script);
+    return () => script.remove();
+  }, [page.js]);
+
+  return (
+    <div className="custom-redirect-page min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md text-center rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+        {isPreview && (
+          <span
+            className={cn(
+              "inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ring-1 mb-3",
+              "bg-warning/10 text-warning ring-warning/20"
+            )}
+          >
+            Preview mode
+          </span>
+        )}
+        {hasContent ? (
+          <div
+            className="custom-redirect-content text-sm text-foreground"
+            dangerouslySetInnerHTML={{ __html: safeHtml }}
+          />
+        ) : !markup ? (
+          <p className="text-sm text-muted-foreground">Redirecting...</p>
+        ) : null}
+        {markup ? (
+          <div ref={markupRef} className="custom-redirect-html text-sm text-foreground" />
+        ) : null}
+        {host && (
+          <p className="text-xs text-muted-foreground mt-3">Continuing to {host}</p>
+        )}
+        {isPreview && variant && (
+          <p className="text-xs text-muted-foreground mt-1">A/B variant: {variant}</p>
+        )}
+        <CountdownLine text={page.countdownText} seconds={countdown} />
+        <Button className="mt-5 w-full sm:w-auto" onClick={onContinue}>
+          {page.buttonLabel}
+        </Button>
       </div>
     </div>
   );

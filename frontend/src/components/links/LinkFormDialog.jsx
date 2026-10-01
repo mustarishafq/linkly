@@ -4,9 +4,19 @@ import { buildQrDesignSnapshot, DEFAULT_QR_DESIGN, normalizeQrDesign } from "@/l
 import { buildNotificationRulePayload, normalizeNotificationRuleFromApi } from "@/lib/linkNotificationConfig";
 import LinkQrStyleSection from "@/components/links/LinkQrStyleSection";
 import LinkNotificationSection from "@/components/links/LinkNotificationSection";
+import CustomRedirectSection from "@/components/links/CustomRedirectSection";
+import {
+  DEFAULT_REDIRECT_BUTTON_LABEL,
+  DEFAULT_REDIRECT_COUNTDOWN_TEXT,
+  DEFAULT_REDIRECT_DELAY,
+  clampCustomCode,
+  clampRedirectDelay,
+  normalizeRedirectButtonLabel,
+  normalizeRedirectCountdownText,
+} from "@/lib/customRedirect";
 import { useAuth } from "@/lib/AuthContext";
 
-import { RefreshCw } from "lucide-react";
+import { Link2, RefreshCw } from "lucide-react";
 import { generateSlug, getShortUrl } from "@/lib/qrcode";
 import { isReservedShortLinkSlug } from "@/lib/reservedPaths";
 import { toast } from "@/components/ui/use-toast";
@@ -15,6 +25,18 @@ import { getTestLinkUrl } from "@/lib/linkPreview";
 import FormDialog, { FormDialogBody, FormDialogFooter } from "@/components/ui/form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
+
+const controlClass =
+  "w-full mt-1.5 h-10 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20";
+
+function FormField({ label, className, children }) {
+  return (
+    <div className={className}>
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      {children}
+    </div>
+  );
+}
 
 export default function LinkFormDialog({ link, campaigns, domains = [], onClose, onSaved }) {
   const { user } = useAuth();
@@ -30,6 +52,15 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
     expire_by_clicks: link?.expire_by_clicks || "",
     fallback_url: link?.fallback_url || "",
     custom_domain: link?.custom_domain || "",
+    custom_redirect_enabled: Boolean(link?.custom_redirect_enabled),
+    custom_redirect_html: link?.custom_redirect_html || "",
+    custom_redirect_delay: link?.custom_redirect_delay ?? DEFAULT_REDIRECT_DELAY,
+    custom_redirect_button_label: link?.custom_redirect_button_label || DEFAULT_REDIRECT_BUTTON_LABEL,
+    custom_redirect_countdown_text:
+      link?.custom_redirect_countdown_text || DEFAULT_REDIRECT_COUNTDOWN_TEXT,
+    custom_redirect_raw_html: link?.custom_redirect_raw_html || "",
+    custom_redirect_css: link?.custom_redirect_css || "",
+    custom_redirect_js: link?.custom_redirect_js || "",
   });
   const [saving, setSaving] = useState(false);
   const [qrMode, setQrMode] = useState("default");
@@ -38,6 +69,7 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
     ...DEFAULT_QR_DESIGN,
     name: "Custom QR",
   });
+  const [redirectExpanded, setRedirectExpanded] = useState(Boolean(link?.custom_redirect_enabled));
   const [notificationExpanded, setNotificationExpanded] = useState(false);
   const [notificationRules, setNotificationRules] = useState([]);
   const [directoryUsers, setDirectoryUsers] = useState([]);
@@ -186,6 +218,14 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
       expire_by_clicks: form.expire_by_clicks ? Number(form.expire_by_clicks) : null,
       fallback_url: form.fallback_url || null,
       custom_domain: form.custom_domain || null,
+      custom_redirect_enabled: Boolean(form.custom_redirect_enabled),
+      custom_redirect_html: form.custom_redirect_html || "",
+      custom_redirect_delay: clampRedirectDelay(form.custom_redirect_delay),
+      custom_redirect_button_label: normalizeRedirectButtonLabel(form.custom_redirect_button_label),
+      custom_redirect_countdown_text: normalizeRedirectCountdownText(form.custom_redirect_countdown_text),
+      custom_redirect_raw_html: clampCustomCode(form.custom_redirect_raw_html),
+      custom_redirect_css: clampCustomCode(form.custom_redirect_css),
+      custom_redirect_js: clampCustomCode(form.custom_redirect_js),
       status: "active",
     };
 
@@ -306,128 +346,123 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
     <FormDialog
       onClose={onClose}
       title={isEditing ? "Edit Link" : "Create New Link"}
-      maxWidth="lg"
+      icon={Link2}
+      maxWidth="4xl"
       tall
     >
       <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-        <FormDialogBody className="space-y-4">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Title (optional)</label>
-            <input
-              type="text"
-              placeholder="e.g. Raya Promo Landing"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Destination URL *</label>
-            <input
-              type="url"
-              placeholder="https://example.com/your-page"
-              value={form.destination_url}
-              onChange={(e) => setForm({ ...form, destination_url: e.target.value })}
-              required
-              className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Slug</label>
-            <div className="flex gap-2 mt-1">
-              <input
-                type="text"
-                value={form.slug}
-                onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                className="flex-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, slug: generateSlug() })}
-                className="px-3 py-2.5 rounded-lg border border-border hover:bg-secondary transition-colors"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </button>
+        <FormDialogBody className="space-y-5">
+          <section className="space-y-3">
+            <p className="text-sm font-semibold">Link details</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+              <FormField label="Title (optional)">
+                <input
+                  type="text"
+                  placeholder="e.g. Raya Promo Landing"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Destination URL *">
+                <input
+                  type="url"
+                  placeholder="https://example.com/your-page"
+                  value={form.destination_url}
+                  onChange={(e) => setForm({ ...form, destination_url: e.target.value })}
+                  required
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Slug">
+                <div className="flex gap-2 mt-1.5">
+                  <input
+                    type="text"
+                    value={form.slug}
+                    onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                    className="flex-1 h-10 px-3 rounded-lg border border-border bg-background text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, slug: generateSlug() })}
+                    className="h-10 px-3 rounded-lg border border-border hover:bg-secondary transition-colors"
+                    aria-label="Generate slug"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-primary mt-1.5 font-mono truncate">{shortPreview}</p>
+              </FormField>
+              <FormField label="Short domain">
+                <select
+                  value={form.custom_domain}
+                  onChange={(e) => setForm({ ...form, custom_domain: e.target.value })}
+                  className={controlClass}
+                >
+                  <option value="">Default ({window.location.host})</option>
+                  {domains.map((d) => (
+                    <option key={d.id} value={d.domain}>{d.domain}</option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label="Tags (comma separated)">
+                <input
+                  type="text"
+                  placeholder="promo, social, raya"
+                  value={form.tags}
+                  onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Campaign">
+                <select
+                  value={form.campaign_id}
+                  onChange={(e) => setForm({ ...form, campaign_id: e.target.value })}
+                  className={controlClass}
+                >
+                  <option value="">No campaign</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label="Facebook Pixel ID (optional)" className="md:col-span-2">
+                <input
+                  type="text"
+                  placeholder="123456789"
+                  value={form.facebook_pixel_id}
+                  onChange={(e) => setForm({ ...form, facebook_pixel_id: e.target.value })}
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Expire by date">
+                <input
+                  type="date"
+                  value={form.expire_by_date}
+                  onChange={(e) => setForm({ ...form, expire_by_date: e.target.value })}
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Expire by clicks">
+                <input
+                  type="number"
+                  placeholder="1000"
+                  value={form.expire_by_clicks}
+                  onChange={(e) => setForm({ ...form, expire_by_clicks: e.target.value })}
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Fallback URL (after expiry)" className="md:col-span-2">
+                <input
+                  type="url"
+                  placeholder="https://example.com/expired"
+                  value={form.fallback_url}
+                  onChange={(e) => setForm({ ...form, fallback_url: e.target.value })}
+                  className={controlClass}
+                />
+              </FormField>
             </div>
-            <p className="text-[11px] text-primary mt-1.5 font-mono truncate">{shortPreview}</p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Short Domain</label>
-            <select
-              value={form.custom_domain}
-              onChange={(e) => setForm({ ...form, custom_domain: e.target.value })}
-              className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm"
-            >
-              <option value="">Default ({window.location.host})</option>
-              {domains.map((d) => (
-                <option key={d.id} value={d.domain}>{d.domain}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Tags (comma separated)</label>
-            <input
-              type="text"
-              placeholder="promo, social, raya"
-              value={form.tags}
-              onChange={(e) => setForm({ ...form, tags: e.target.value })}
-              className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Campaign</label>
-            <select
-              value={form.campaign_id}
-              onChange={(e) => setForm({ ...form, campaign_id: e.target.value })}
-              className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm"
-            >
-              <option value="">No campaign</option>
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Facebook Pixel ID (optional)</label>
-            <input
-              type="text"
-              placeholder="123456789"
-              value={form.facebook_pixel_id}
-              onChange={(e) => setForm({ ...form, facebook_pixel_id: e.target.value })}
-              className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Expire by Date</label>
-              <input
-                type="date"
-                value={form.expire_by_date}
-                onChange={(e) => setForm({ ...form, expire_by_date: e.target.value })}
-                className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Expire by Clicks</label>
-              <input
-                type="number"
-                placeholder="1000"
-                value={form.expire_by_clicks}
-                onChange={(e) => setForm({ ...form, expire_by_clicks: e.target.value })}
-                className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Fallback URL (after expiry)</label>
-            <input
-              type="url"
-              placeholder="https://example.com/expired"
-              value={form.fallback_url}
-              onChange={(e) => setForm({ ...form, fallback_url: e.target.value })}
-              className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
+          </section>
           {!isEditing && (
             <LinkQrStyleSection
               slug={form.slug}
@@ -439,6 +474,20 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
               orgDefault={orgQrDefault}
             />
           )}
+          <CustomRedirectSection
+            expanded={redirectExpanded}
+            onExpandedChange={setRedirectExpanded}
+            enabled={form.custom_redirect_enabled}
+            html={form.custom_redirect_html}
+            delay={form.custom_redirect_delay}
+            buttonLabel={form.custom_redirect_button_label}
+            countdownText={form.custom_redirect_countdown_text}
+            rawHtml={form.custom_redirect_raw_html}
+            css={form.custom_redirect_css}
+            js={form.custom_redirect_js}
+            destinationUrl={form.destination_url}
+            onChange={(updates) => setForm((current) => ({ ...current, ...updates }))}
+          />
           <LinkNotificationSection
             expanded={notificationExpanded}
             onExpandedChange={setNotificationExpanded}
@@ -448,16 +497,16 @@ export default function LinkFormDialog({ link, campaigns, domains = [], onClose,
             currentUserId={user?.id}
           />
         </FormDialogBody>
-        <FormDialogFooter>
+        <FormDialogFooter className="sm:justify-end">
           <Button
             type="button"
             variant="outline"
-            className="flex-1 h-10"
+            className="h-10 flex-1 sm:flex-none sm:min-w-28"
             onClick={onClose}
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={saving} className="flex-1 h-10">
+          <Button type="submit" disabled={saving} className="h-10 flex-1 sm:flex-none sm:min-w-28">
             {saving ? "Saving..." : isEditing ? "Update Link" : "Create Link"}
           </Button>
         </FormDialogFooter>
