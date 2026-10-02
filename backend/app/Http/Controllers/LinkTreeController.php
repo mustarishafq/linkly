@@ -69,6 +69,18 @@ class LinkTreeController extends Controller
         'rounded',
     ];
 
+    /** Hosts that cannot be played as page audio. */
+    private const BLOCKED_AUDIO_HOSTS = [
+        'spotify.com',
+        'music.apple.com',
+        'youtube.com',
+        'youtu.be',
+        'soundcloud.com',
+        'tidal.com',
+        'music.amazon.com',
+        'deezer.com',
+    ];
+
     private const BACKGROUND_FITS = [
         'cover',
         'contain',
@@ -660,6 +672,33 @@ class LinkTreeController extends Controller
             ? (bool) $theme['show_branding']
             : true;
 
+        $audioUrl = trim((string) ($theme['background_audio_url'] ?? ''));
+        if (strlen($audioUrl) > 2048) {
+            return $this->error('invalid_theme', 'Background song URL is too long', 422);
+        }
+        $audioIssue = $this->backgroundAudioIssue($audioUrl);
+        if ($audioIssue !== null) {
+            return $this->error('invalid_theme', $audioIssue, 422);
+        }
+
+        $audioTitle = trim((string) ($theme['background_audio_title'] ?? ''));
+        if (mb_strlen($audioTitle) > 120) {
+            return $this->error('invalid_theme', 'Song title must be 120 characters or fewer', 422);
+        }
+
+        $audioArtist = trim((string) ($theme['background_audio_artist'] ?? ''));
+        if (mb_strlen($audioArtist) > 120) {
+            return $this->error('invalid_theme', 'Artist name must be 120 characters or fewer', 422);
+        }
+
+        $audioCover = trim((string) ($theme['background_audio_cover_url'] ?? ''));
+        if (strlen($audioCover) > 2048) {
+            return $this->error('invalid_theme', 'Song cover URL is too long', 422);
+        }
+        if ($audioCover !== '' && ! $this->isHttpUrl($audioCover)) {
+            return $this->error('invalid_theme', 'Song cover must be a valid http(s) URL', 422);
+        }
+
         return [
             'background_preset' => $preset,
             'background_image_url' => $backgroundImage,
@@ -673,6 +712,10 @@ class LinkTreeController extends Controller
             'avatar_shape' => $avatarShape,
             'accent_color' => $accent,
             'show_branding' => $showBranding,
+            'background_audio_url' => $audioUrl,
+            'background_audio_title' => $audioTitle,
+            'background_audio_artist' => $audioArtist,
+            'background_audio_cover_url' => $audioCover,
         ];
     }
 
@@ -986,7 +1029,33 @@ class LinkTreeController extends Controller
             'avatar_shape' => 'circle',
             'accent_color' => '#0f766e',
             'show_branding' => true,
+            'background_audio_url' => '',
+            'background_audio_title' => '',
+            'background_audio_artist' => '',
+            'background_audio_cover_url' => '',
         ];
+    }
+
+    private function backgroundAudioIssue(string $url): ?string
+    {
+        if ($url === '') {
+            return null;
+        }
+
+        if (! $this->isHttpUrl($url)) {
+            return 'Background song must be a valid http(s) URL';
+        }
+
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $host = preg_replace('/^www\./', '', $host) ?? $host;
+
+        foreach (self::BLOCKED_AUDIO_HOSTS as $blocked) {
+            if ($host === $blocked || str_ends_with($host, '.'.$blocked)) {
+                return 'Spotify, Apple Music, YouTube, and SoundCloud cannot play as page audio. Use a direct audio file URL.';
+            }
+        }
+
+        return null;
     }
 
     private function normalizeSlug(string $value): string

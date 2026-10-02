@@ -8,7 +8,7 @@ export default function AppLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden">
       <TopBar />
       <main className="flex-1 min-w-0 pt-16 pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
         <div className="max-w-[1600px] mx-auto w-full p-4 sm:p-6">

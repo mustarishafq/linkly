@@ -163,7 +163,49 @@ export const DEFAULT_THEME = {
   avatar_shape: "circle",
   accent_color: "#0f766e",
   show_branding: true,
+  background_audio_url: "",
+  background_audio_title: "",
+  background_audio_artist: "",
+  background_audio_cover_url: "",
 };
+
+/** Hosts that only embed or link out — they cannot play as page audio. */
+const BLOCKED_AUDIO_HOSTS = [
+  "spotify.com",
+  "music.apple.com",
+  "youtube.com",
+  "youtu.be",
+  "soundcloud.com",
+  "tidal.com",
+  "music.amazon.com",
+  "deezer.com",
+];
+
+export function backgroundAudioIssue(rawUrl) {
+  const url = String(rawUrl || "").trim();
+  if (!url) return null;
+
+  let host = "";
+  try {
+    host = new URL(normalizeHttpUrl(url)).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "Enter a valid audio file URL.";
+  }
+
+  const blocked = BLOCKED_AUDIO_HOSTS.some(
+    (name) => host === name || host.endsWith(`.${name}`)
+  );
+  if (blocked) {
+    return "Spotify, Apple Music, YouTube, and SoundCloud cannot play as page audio. Use a direct MP3, M4A, OGG, or WAV file URL.";
+  }
+
+  return null;
+}
+
+export function hasBackgroundSong(theme) {
+  const url = String(theme?.background_audio_url || "").trim();
+  return Boolean(url) && !backgroundAudioIssue(url);
+}
 
 export function getBackgroundPreset(id) {
   return BACKGROUND_PRESETS.find((p) => p.id === id) || BACKGROUND_PRESETS[0];

@@ -43,6 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BackgroundSongPlayer } from "@/components/linktrees/BackgroundSongPlayer";
 import { LinkTreeContent } from "@/components/linktrees/LinkTreeContent";
 import { summarizeLinkTreeClicks } from "@/lib/linkTreeAnalytics";
 import {
@@ -59,6 +60,8 @@ import {
   BUTTON_RADII,
   BUTTON_STYLES,
   DEFAULT_THEME,
+  backgroundAudioIssue,
+  hasBackgroundSong,
   FONT_STYLES,
   LINK_BLOCK_TYPES,
   SOCIAL_PLATFORMS,
@@ -159,7 +162,7 @@ function LivePreview({ title, bio, avatarUrl, theme, links, socials }) {
         <div className="absolute -right-[12px] top-36 h-14 w-[2.5px] rounded-r-sm bg-zinc-800" aria-hidden />
 
         <div className="relative overflow-hidden rounded-[1.65rem] h-[520px] sm:h-[560px] bg-zinc-950">
-          <div className="absolute inset-0 overflow-y-auto">
+          <div className="absolute inset-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <LinkTreeContent
               title={title}
               bio={bio}
@@ -181,6 +184,11 @@ function LivePreview({ title, bio, avatarUrl, theme, links, socials }) {
             <div className="absolute left-1/2 -translate-x-1/2 top-2 h-[20px] w-[84px] rounded-full bg-zinc-950" />
             <span className="w-8 text-right opacity-70">▌▌</span>
           </div>
+          {hasBackgroundSong(theme) ? (
+            <div className="absolute bottom-5 left-2 right-2 z-20">
+              <BackgroundSongPlayer theme={theme} compact />
+            </div>
+          ) : null}
           <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 h-1 w-24 rounded-full bg-zinc-950/40 z-20 pointer-events-none" />
         </div>
       </div>
@@ -288,7 +296,7 @@ function BlockFields({ link, updateLink }) {
         />
         <div className="space-y-1.5">
           <p className="text-[11px] font-medium text-muted-foreground">Icon</p>
-          <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-40 overflow-y-auto rounded-xl border border-border bg-muted/30 p-2">
+          <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-40 overflow-y-auto rounded-xl border border-border bg-muted/30 p-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {CUSTOM_BLOCK_ICONS.map(({ id, label, Icon }) => {
               const active = selectedIcon === id;
               return (
@@ -575,6 +583,11 @@ export default function LinkTreeDetail() {
 
   async function save(nextStatus = status) {
     if (!canManage) return;
+    const audioIssue = backgroundAudioIssue(theme.background_audio_url);
+    if (audioIssue) {
+      toast.error(audioIssue);
+      return null;
+    }
     setSaving(true);
     try {
       const updated = await db.linkTrees.update(id, {
@@ -593,6 +606,10 @@ export default function LinkTreeDetail() {
           background_position: theme.background_position || DEFAULT_THEME.background_position,
           background_zoom: clampBackgroundZoom(theme.background_zoom),
           overlay_opacity: clampOverlayOpacity(theme.overlay_opacity),
+          background_audio_url: normalizeHttpUrl(theme.background_audio_url) || "",
+          background_audio_title: theme.background_audio_title?.trim() || "",
+          background_audio_artist: theme.background_audio_artist?.trim() || "",
+          background_audio_cover_url: normalizeHttpUrl(theme.background_audio_cover_url) || "",
         },
         socials: socialsForSave(),
         links: links.map((l, i) => ({
@@ -1119,6 +1136,60 @@ export default function LinkTreeDetail() {
                     className="w-full"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Background song</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Plays while someone views this page. Browsers start sound after the first tap, then the song loops.
+                  </p>
+                </div>
+                <Field
+                  label="Audio file URL"
+                  htmlFor="background-audio-url"
+                  hint="Direct MP3, M4A, OGG, or WAV file. Spotify and YouTube links cannot play as page audio."
+                >
+                  <Input
+                    id="background-audio-url"
+                    value={theme.background_audio_url || ""}
+                    onChange={(e) => setTheme((t) => ({ ...t, background_audio_url: e.target.value }))}
+                    placeholder="https://…/song.mp3"
+                    className="h-9"
+                  />
+                </Field>
+                {backgroundAudioIssue(theme.background_audio_url) ? (
+                  <p className="text-xs text-destructive">{backgroundAudioIssue(theme.background_audio_url)}</p>
+                ) : null}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <Field label="Song title" htmlFor="background-audio-title">
+                    <Input
+                      id="background-audio-title"
+                      value={theme.background_audio_title || ""}
+                      onChange={(e) => setTheme((t) => ({ ...t, background_audio_title: e.target.value }))}
+                      placeholder="Song name"
+                      className="h-9"
+                    />
+                  </Field>
+                  <Field label="Artist" htmlFor="background-audio-artist">
+                    <Input
+                      id="background-audio-artist"
+                      value={theme.background_audio_artist || ""}
+                      onChange={(e) => setTheme((t) => ({ ...t, background_audio_artist: e.target.value }))}
+                      placeholder="Artist name"
+                      className="h-9"
+                    />
+                  </Field>
+                </div>
+                <Field label="Cover image URL" htmlFor="background-audio-cover" hint="Optional.">
+                  <Input
+                    id="background-audio-cover"
+                    value={theme.background_audio_cover_url || ""}
+                    onChange={(e) => setTheme((t) => ({ ...t, background_audio_cover_url: e.target.value }))}
+                    placeholder="https://…/cover.jpg"
+                    className="h-9"
+                  />
+                </Field>
               </div>
 
               <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-4 py-3">

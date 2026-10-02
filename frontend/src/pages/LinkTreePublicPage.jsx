@@ -4,6 +4,7 @@ import { useParams, Link } from "react-router-dom";
 import { GalleryVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { BackgroundSongPlayer } from "@/components/linktrees/BackgroundSongPlayer";
 import { LinkTreeContent } from "@/components/linktrees/LinkTreeContent";
 import { trackLinkTreeEvent } from "@/lib/linkTreeAnalytics";
 import { DEFAULT_THEME, treeSurfaceClasses } from "@/lib/linkTreeTheme";
@@ -86,22 +87,25 @@ export default function LinkTreePublicPage() {
   const surface = treeSurfaceClasses(theme);
 
   return (
-    <LinkTreeContent
-      title={tree.title}
-      bio={tree.bio}
-      avatarUrl={tree.avatar_url}
-      theme={theme}
-      links={tree.links}
-      socials={tree.socials}
-      analyticsSlug={tree.slug}
-      className="min-h-screen"
-      footer={
-        theme.show_branding !== false ? (
-          <footer className={cn("py-6 text-center text-xs", surface.subtle)}>
-            Powered by {APP_NAME}
-          </footer>
-        ) : null
-      }
-    />
+    <>
+      <LinkTreeContent
+        title={tree.title}
+        bio={tree.bio}
+        avatarUrl={tree.avatar_url}
+        theme={theme}
+        links={tree.links}
+        socials={tree.socials}
+        analyticsSlug={tree.slug}
+        className="min-h-screen"
+        footer={
+          theme.show_branding !== false ? (
+            <footer className={cn("py-6 text-center text-xs", surface.subtle)}>
+              Powered by {APP_NAME}
+            </footer>
+          ) : null
+        }
+      />
+      <BackgroundSongPlayer theme={theme} />
+    </>
   );
 }
