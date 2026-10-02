@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/AuthContext";
+import { canManageRecord } from "@/lib/recordAccess";
 import { glassPanelStyles } from "@/components/layout/glassStyles";
 
 const VARIANT_COLORS = [
@@ -290,6 +291,7 @@ export default function LinkDetail() {
   const [showEdit, setShowEdit] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [showQrDesigns, setShowQrDesigns] = useState(false);
+  const canEdit = canManageRecord(user, link);
 
   useEffect(() => {
     async function load() {
@@ -511,6 +513,7 @@ export default function LinkDetail() {
               )}
             </button>
             <p className="text-xs text-muted-foreground mt-1.5">
+              {!canEdit && "View only · shared through a team · "}
               Created {format(new Date(link.created_date), "MMM d, yyyy")}
               {link.expire_by_date && ` · Expires ${format(new Date(link.expire_by_date), "MMM d, yyyy")}`}
               {link.custom_domain && (
@@ -558,26 +561,30 @@ export default function LinkDetail() {
               <QrCode className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">QR</span>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full px-0 sm:w-auto sm:px-3"
-              onClick={() => setShowQrDesigns(true)}
-              aria-label="Manage QR designs"
-            >
-              <Palette className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Designs</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full px-0 sm:w-auto sm:px-3"
-              onClick={() => setShowEdit(true)}
-              aria-label="Edit link"
-            >
-              <Edit className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Edit</span>
-            </Button>
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full px-0 sm:w-auto sm:px-3"
+                onClick={() => setShowQrDesigns(true)}
+                aria-label="Manage QR designs"
+              >
+                <Palette className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Designs</span>
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full px-0 sm:w-auto sm:px-3"
+                onClick={() => setShowEdit(true)}
+                aria-label="Edit link"
+              >
+                <Edit className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Edit</span>
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="default" size="sm" className="w-full px-0 sm:w-auto sm:px-3" aria-label="Visit options">
@@ -737,7 +744,7 @@ export default function LinkDetail() {
         <LinkFormDialog
           link={link}
           campaigns={campaigns}
-          domains={domains.filter((d) => (user?.role === "admin" || d.owner_user_id === user?.id) && d.is_active !== false)}
+          domains={domains.filter((d) => d.is_active !== false)}
           onClose={() => setShowEdit(false)}
           onSaved={() => { setShowEdit(false); reloadLink(); }}
         />

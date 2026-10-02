@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { canManageRecord } from "@/lib/recordAccess";
 import { toast } from "@/components/ui/use-toast";
 import {
   DropdownMenu,
@@ -359,7 +360,7 @@ export default function LinkTrees() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => navigate(`/linktrees/${tree.id}`)}>
                         <Edit className="h-3.5 w-3.5 mr-2" />
-                        Edit
+                        {canManageRecord(user, tree) ? "Edit" : "View"}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => copyPublicUrl(tree)}>
                         <Copy className="h-3.5 w-3.5 mr-2" />
@@ -373,30 +374,34 @@ export default function LinkTrees() {
                           </a>
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuSeparator />
-                      {tree.status !== "published" && (
-                        <DropdownMenuItem onClick={() => promptStatusChange(tree, "published")}>
-                          Publish
-                        </DropdownMenuItem>
+                      {canManageRecord(user, tree) && (
+                        <>
+                          <DropdownMenuSeparator />
+                          {tree.status !== "published" && (
+                            <DropdownMenuItem onClick={() => promptStatusChange(tree, "published")}>
+                              Publish
+                            </DropdownMenuItem>
+                          )}
+                          {tree.status === "published" && (
+                            <DropdownMenuItem onClick={() => promptStatusChange(tree, "paused")}>
+                              Pause
+                            </DropdownMenuItem>
+                          )}
+                          {tree.status !== "draft" && (
+                            <DropdownMenuItem onClick={() => promptStatusChange(tree, "draft")}>
+                              Move to draft
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => promptDelete(tree)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
                       )}
-                      {tree.status === "published" && (
-                        <DropdownMenuItem onClick={() => promptStatusChange(tree, "paused")}>
-                          Pause
-                        </DropdownMenuItem>
-                      )}
-                      {tree.status !== "draft" && (
-                        <DropdownMenuItem onClick={() => promptStatusChange(tree, "draft")}>
-                          Move to draft
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => promptDelete(tree)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </motion.div>

@@ -29,6 +29,8 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuth } from "@/lib/AuthContext";
+import { canManageRecord } from "@/lib/recordAccess";
 import PageHeader from "@/components/layout/PageHeader";
 import DashboardWidget from "@/components/dashboard/DashboardWidget";
 import StatCard from "@/components/ui/StatCard";
@@ -103,6 +105,7 @@ function RedirectsSkeleton() {
 }
 
 export default function SmartRedirects() {
+  const { user } = useAuth();
   const [rules, setRules] = useState([]);
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -345,7 +348,11 @@ export default function SmartRedirects() {
       </motion.div>
 
       {showForm && (
-        <RedirectRuleForm links={links} onClose={() => setShowForm(false)} onSaved={loadData} />
+        <RedirectRuleForm
+          links={links.filter((link) => canManageRecord(user, link))}
+          onClose={() => setShowForm(false)}
+          onSaved={loadData}
+        />
       )}
 
       {confirmDialog}
@@ -418,6 +425,8 @@ function EmptyState({ hasFilters, onCreate }) {
 }
 
 function RuleRow({ rule, link, index, onToggle, onDelete }) {
+  const { user } = useAuth();
+  const canManage = canManageRecord(user, link);
   const meta = RULE_META[rule.rule_type] || RULE_META.country;
   const Icon = meta.icon;
   const displayUrl = rule.redirect_url.replace(/^https?:\/\//, "");
@@ -477,14 +486,16 @@ function RuleRow({ rule, link, index, onToggle, onDelete }) {
 
         <div className="flex items-center gap-2 shrink-0">
           <div className="hidden sm:flex items-center gap-2">
-            <Switch
-              checked={rule.is_active}
-              onCheckedChange={onToggle}
-              aria-label={rule.is_active ? "Disable rule" : "Enable rule"}
-            />
+            {canManage && (
+              <Switch
+                checked={rule.is_active}
+                onCheckedChange={onToggle}
+                aria-label={rule.is_active ? "Disable rule" : "Enable rule"}
+              />
+            )}
             <RuleStatusBadge active={rule.is_active} />
           </div>
-          <RuleActionsMenu rule={rule} onToggle={onToggle} onDelete={onDelete} />
+          {canManage && <RuleActionsMenu rule={rule} onToggle={onToggle} onDelete={onDelete} />}
         </div>
       </div>
     </motion.div>

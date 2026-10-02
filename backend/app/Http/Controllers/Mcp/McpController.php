@@ -17,7 +17,7 @@ abstract class McpController extends Controller
 
     /**
      * API-key clients act as the installation and can read every record.
-     * A signed-in user with role "user" only sees records they own.
+     * A signed-in user with role "user" sees records they own and records shared through a team.
      */
     protected function recordViewer(Request $request): ?object
     {

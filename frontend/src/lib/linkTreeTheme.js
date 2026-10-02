@@ -122,6 +122,7 @@ export const CONTACT_BLOCK_TYPES = ["email", "phone", "whatsapp", "maps"];
 
 export const SOCIAL_PLATFORMS = [
   { id: "instagram", label: "Instagram", placeholder: "https://instagram.com/…" },
+  { id: "threads", label: "Threads", placeholder: "https://www.threads.com/@…" },
   { id: "x", label: "X / Twitter", placeholder: "https://x.com/…" },
   { id: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@…" },
   { id: "youtube", label: "YouTube", placeholder: "https://youtube.com/@…" },

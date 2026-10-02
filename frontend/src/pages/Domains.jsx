@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { canManageRecord } from "@/lib/recordAccess";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/layout/PageHeader";
@@ -142,10 +143,7 @@ export default function Domains() {
       db.entities.CustomDomain.list("-created_date", 300),
       db.entities.ShortLink.list("-created_date", 500),
     ]);
-    const visible = all.filter(
-      (item) => user?.role === "admin" || item.owner_user_id === user?.id
-    );
-    setDomains(visible);
+    setDomains(Array.isArray(all) ? all : []);
     setLinks(allLinks);
     setLoading(false);
   }
@@ -575,7 +573,9 @@ function CopyField({ label, value, onCopy }) {
 }
 
 function DomainActionsMenu({ domain, verifying, onVerify, onToggleActive, onDelete }) {
+  const { user } = useAuth();
   const isActive = domain.is_active !== false;
+  if (!canManageRecord(user, domain)) return null;
 
   return (
     <DropdownMenu>

@@ -34,6 +34,7 @@ import { toast } from "@/components/ui/use-toast";
 import { getShortUrl } from "@/lib/qrcode";
 import { getTestLinkUrl } from "@/lib/linkPreview";
 import { useAuth } from "@/lib/AuthContext";
+import { canManageRecord } from "@/lib/recordAccess";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import LinkFormDialog from "@/components/links/LinkFormDialog";
 import LinkFavicon from "@/components/links/LinkFavicon";
@@ -111,7 +112,6 @@ export default function Links() {
     }
   });
   const location = useLocation();
-  const { user } = useAuth();
   const { requestConfirm, dialog: confirmDialog } = useConfirmDialog();
 
   function setView(mode) {
@@ -370,7 +370,7 @@ export default function Links() {
         <LinkFormDialog
           link={editingLink}
           campaigns={campaigns}
-          domains={domains.filter((d) => (user?.role === "admin" || d.owner_user_id === user?.id) && d.is_active !== false)}
+          domains={domains.filter((d) => d.is_active !== false)}
           onClose={() => { setShowForm(false); setEditingLink(null); }}
           onSaved={loadData}
         />
@@ -421,6 +421,8 @@ function ViewToggle({ viewMode, onChange }) {
 }
 
 function LinkActionsMenu({ link, onCopy, onQr, onEdit, onDelete, triggerClassName }) {
+  const { user } = useAuth();
+  const canManage = canManageRecord(user, link);
   const testLinkUrl = getTestLinkUrl(link.slug, link.custom_domain);
 
   return (
@@ -474,9 +476,11 @@ function LinkActionsMenu({ link, onCopy, onQr, onEdit, onDelete, triggerClassNam
               <PlayCircle className="h-3.5 w-3.5 mr-2" /> Test link
             </a>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onEdit}>
-            <Edit className="h-3.5 w-3.5 mr-2" /> Edit
-          </DropdownMenuItem>
+          {canManage && (
+            <DropdownMenuItem onClick={onEdit}>
+              <Edit className="h-3.5 w-3.5 mr-2" /> Edit
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem asChild>
             <Link to={`/links/${link.id}`}>
               <ChevronRight className="h-3.5 w-3.5 mr-2" /> View Details
@@ -487,13 +491,17 @@ function LinkActionsMenu({ link, onCopy, onQr, onEdit, onDelete, triggerClassNam
               <ExternalLink className="h-3.5 w-3.5 mr-2" /> Open destination
             </a>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={onDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-          </DropdownMenuItem>
+          {canManage && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </>

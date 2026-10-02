@@ -3,7 +3,8 @@
 namespace App\Services;
 
 /**
- * Role "user" may read and change only records they own.
+ * Role "user" may change only records they own.
+ * They may read their own records and records owned by someone on a shared team.
  * Admins can access every record. Public redirect traffic stays anonymous
  * and is limited to slug lookup plus click counters.
  */
@@ -20,7 +21,16 @@ class EntityAccessService
     /** @var array<string, array<string, true>> */
     private array $ownedIds = [];
 
-    public function __construct(private EntityService $entities) {}
+    /** @var array<string, array<string, true>> */
+    private array $visibleIds = [];
+
+    /** @var array<string, array<string, true>> */
+    private array $teammateIds = [];
+
+    public function __construct(
+        private EntityService $entities,
+        private TeamService $teams,
+    ) {}
 
     public function isAdmin(?object $user): bool
     {
@@ -54,6 +64,35 @@ class EntityAccessService
     }
 
     public function canRead(?object $user, string $entity, array $row): bool
+    {
+        if ($this->isAdmin($user)) {
+            return true;
+        }
+
+        if (! $user) {
+            return false;
+        }
+
+        if (in_array($entity, self::OWNED_ENTITIES, true)) {
+            return $this->sharesTeam($user, $row[self::OWNER_FIELD] ?? null);
+        }
+
+        if ($entity === 'ClickLog') {
+            if ($this->canReadParent($user, 'ShortLink', $row['link_id'] ?? null)) {
+                return true;
+            }
+
+            return $this->canReadParent($user, 'LinkTree', $row['link_tree_id'] ?? null);
+        }
+
+        if (in_array($entity, self::LINK_CHILD_ENTITIES, true)) {
+            return $this->canReadParent($user, 'ShortLink', $row['link_id'] ?? null);
+        }
+
+        return false;
+    }
+
+    public function canMutate(?object $user, string $entity, array $row): bool
     {
         if ($this->isAdmin($user)) {
             return true;
@@ -196,6 +235,68 @@ class EntityAccessService
         }
 
         return $this->ownedIds[$cacheKey] = $ids;
+    }
+
+    private function canReadParent(object $user, string $parentEntity, mixed $parentId): bool
+    {
+        if (! $this->presentOwner($parentId)) {
+            return false;
+        }
+
+        $ids = $this->visibleParentIds($user, $parentEntity);
+
+        return isset($ids[(string) $parentId]);
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function visibleParentIds(object $user, string $entity): array
+    {
+        $cacheKey = $entity.':'.$user->id;
+        if (isset($this->visibleIds[$cacheKey])) {
+            return $this->visibleIds[$cacheKey];
+        }
+
+        $table = $this->entities->tableFor($entity);
+        $ids = [];
+
+        if ($table) {
+            foreach ($this->entities->fetchAll($table) as $row) {
+                if ($this->sharesTeam($user, $row[self::OWNER_FIELD] ?? null)) {
+                    $ids[(string) $row['id']] = true;
+                }
+            }
+        }
+
+        return $this->visibleIds[$cacheKey] = $ids;
+    }
+
+    private function sharesTeam(object $user, mixed $ownerId): bool
+    {
+        if (! $this->presentOwner($ownerId)) {
+            return false;
+        }
+
+        return isset($this->teammateIdSet($user)[(string) $ownerId]);
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function teammateIdSet(object $user): array
+    {
+        $cacheKey = (string) $user->id;
+        if (isset($this->teammateIds[$cacheKey])) {
+            return $this->teammateIds[$cacheKey];
+        }
+
+        $ids = [];
+        foreach ($this->teams->visibleUserIds((int) $user->id) as $id) {
+            $ids[(string) $id] = true;
+        }
+
+        return $this->teammateIds[$cacheKey] = $ids;
     }
 
     private function sameId(mixed $left, mixed $right): bool

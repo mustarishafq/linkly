@@ -491,7 +491,50 @@ const users = {
   },
 };
 
-const db = { auth, entities, integrations, admin, domains, linkTrees, settings, uploads, users, notifications };
+const teams = {
+  async list() {
+    return request("/teams");
+  },
+
+  async memberOptions() {
+    return request("/teams/member-options");
+  },
+
+  async get(id) {
+    return request(`/teams/${id}`);
+  },
+
+  async create(name, memberIds = []) {
+    return request("/teams", {
+      method: "POST",
+      body: JSON.stringify({ name, member_ids: memberIds }),
+    });
+  },
+
+  async rename(id, name) {
+    return request(`/teams/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  async remove(id) {
+    return request(`/teams/${id}`, { method: "DELETE" });
+  },
+
+  async addMember(id, email) {
+    return request(`/teams/${id}/members`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async removeMember(id, userId) {
+    return request(`/teams/${id}/members/${userId}`, { method: "DELETE" });
+  },
+};
+
+const db = { auth, entities, integrations, admin, domains, linkTrees, settings, uploads, users, teams, notifications };
 
 export { db, publicEntities };
 export default db;

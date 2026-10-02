@@ -25,6 +25,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import UserManagement from "./pages/UserManagement";
+import Teams from "./pages/Teams";
+import TeamDetail from "./pages/TeamDetail";
 import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
 import SsoNexus from "./pages/SsoNexus";
@@ -88,6 +90,8 @@ const AuthenticatedApp = () => {
         <Route path="/ab-testing" element={<ABTesting />} />
         <Route path="/redirects" element={<SmartRedirects />} />
         <Route path="/domains" element={<Domains />} />
+        <Route path="/teams" element={<Teams />} />
+        <Route path="/teams/:id" element={<TeamDetail />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/audit-logs" element={<AuditLogs />} />
         <Route path="/settings" element={<Settings />} />

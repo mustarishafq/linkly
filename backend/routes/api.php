@@ -9,6 +9,7 @@ use App\Http\Controllers\LinkTreeController;
 use App\Http\Controllers\ImageProxyController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\TeamController;
 use App\Http\Controllers\SsoController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\Mcp\McpAuditLogController;
@@ -66,6 +67,15 @@ Route::post('/link-trees/public/{slug}/events', [LinkTreeController::class, 'tra
 
 Route::middleware(JwtAuth::class)->group(function () {
     Route::get('/users/directory', [AuthController::class, 'userDirectory']);
+
+    Route::get('/teams', [TeamController::class, 'index']);
+    Route::get('/teams/member-options', [TeamController::class, 'memberOptions']);
+    Route::post('/teams', [TeamController::class, 'store']);
+    Route::get('/teams/{id}', [TeamController::class, 'show']);
+    Route::patch('/teams/{id}', [TeamController::class, 'update']);
+    Route::delete('/teams/{id}', [TeamController::class, 'destroy']);
+    Route::post('/teams/{id}/members', [TeamController::class, 'addMember']);
+    Route::delete('/teams/{id}/members/{userId}', [TeamController::class, 'removeMember']);
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::get('/notifications/poll', [NotificationController::class, 'poll']);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\EntityAccessService;
 use App\Services\EntityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ class LinkTreeController extends Controller
         'audit-logs',
         'settings',
         'linktrees',
+        'teams',
         't',
     ];
 
@@ -152,6 +154,7 @@ class LinkTreeController extends Controller
 
     private const SOCIAL_PLATFORMS = [
         'instagram',
+        'threads',
         'x',
         'tiktok',
         'youtube',
@@ -167,7 +170,10 @@ class LinkTreeController extends Controller
         'paused',
     ];
 
-    public function __construct(private EntityService $entities) {}
+    public function __construct(
+        private EntityService $entities,
+        private EntityAccessService $access,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -181,7 +187,7 @@ class LinkTreeController extends Controller
         $limit = (int) $request->query('limit', 200);
 
         $all = $this->entities->fetchAll($table);
-        $scoped = array_values(array_filter($all, fn ($row) => $this->canAccess($user, $row)));
+        $scoped = $this->access->visibleRows($user, self::ENTITY, $all);
         $rows = $this->entities->applyLimit($this->entities->sortRecords($scoped, $sortBy), $limit);
 
         return response()->json($rows);
@@ -200,8 +206,8 @@ class LinkTreeController extends Controller
             return $this->error('not_found', 'Link tree not found', 404);
         }
 
-        if (! $this->canAccess($user, $record)) {
-            return $this->error('forbidden', 'You cannot access this link tree', 403);
+        if (! $this->access->canRead($user, self::ENTITY, $record)) {
+            return $this->error('not_found', 'Link tree not found', 404);
         }
 
         return response()->json($record);
@@ -245,7 +251,7 @@ class LinkTreeController extends Controller
             return $this->error('not_found', 'Link tree not found', 404);
         }
 
-        if (! $this->canAccess($user, $existing)) {
+        if (! $this->access->canMutate($user, self::ENTITY, $existing)) {
             return $this->error('forbidden', 'You cannot update this link tree', 403);
         }
 
@@ -287,7 +293,7 @@ class LinkTreeController extends Controller
             return $this->error('not_found', 'Link tree not found', 404);
         }
 
-        if (! $this->canAccess($user, $existing)) {
+        if (! $this->access->canMutate($user, self::ENTITY, $existing)) {
             return $this->error('forbidden', 'You cannot delete this link tree', 403);
         }
 
@@ -495,15 +501,6 @@ class LinkTreeController extends Controller
         }
 
         return $table;
-    }
-
-    private function canAccess(object $user, array $record): bool
-    {
-        if (($user->role ?? '') === 'admin') {
-            return true;
-        }
-
-        return (string) ($record['owner_user_id'] ?? '') === (string) $user->id;
     }
 
     private function validateSlug(string $table, string $slug, ?string $excludeId = null): ?JsonResponse

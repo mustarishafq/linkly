@@ -79,7 +79,7 @@ export function FormDialogFooter({ className, children }) {
   return (
     <div
       className={cn(
-        "flex flex-row gap-3 px-5 py-4 border-t border-border/70 shrink-0",
+        "flex flex-row justify-end gap-2 px-5 py-4 border-t border-border/70 shrink-0",
         className
       )}
     >

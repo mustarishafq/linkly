@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 import BackButton from "@/components/ui/BackButton";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuth } from "@/lib/AuthContext";
+import { canManageRecord } from "@/lib/recordAccess";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -356,6 +358,7 @@ function BlockFields({ link, updateLink }) {
 
 export default function LinkTreeDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const goBack = useGoBack("/linktrees");
   const { requestConfirm, dialog: confirmDialog } = useConfirmDialog();
 
@@ -365,6 +368,7 @@ export default function LinkTreeDetail() {
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState("profile");
 
+  const [ownerUserId, setOwnerUserId] = useState(null);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [bio, setBio] = useState("");
@@ -386,6 +390,7 @@ export default function LinkTreeDetail() {
           setNotFound(true);
           return;
         }
+        setOwnerUserId(tree.owner_user_id ?? null);
         setTitle(tree.title || "");
         setSlug(tree.slug || "");
         setBio(tree.bio || "");
@@ -566,7 +571,10 @@ export default function LinkTreeDetail() {
     }
   }
 
+  const canManage = canManageRecord(user, { owner_user_id: ownerUserId });
+
   async function save(nextStatus = status) {
+    if (!canManage) return;
     setSaving(true);
     try {
       const updated = await db.linkTrees.update(id, {
@@ -696,6 +704,12 @@ export default function LinkTreeDetail() {
                 /t/{slug || "…"}
                 <span className="text-border">·</span>
                 {enabledCount} block{enabledCount === 1 ? "" : "s"}
+                {!canManage && (
+                  <>
+                    <span className="text-border">·</span>
+                    View only
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -713,7 +727,7 @@ export default function LinkTreeDetail() {
                 </a>
               </Button>
             )}
-            {status !== "published" ? (
+            {canManage && (status !== "published" ? (
               <Button type="button" variant="outline" size="sm" onClick={promptPublish} disabled={saving} className="gap-1.5 h-9">
                 <Eye className="h-3.5 w-3.5" />
                 Publish
@@ -723,11 +737,13 @@ export default function LinkTreeDetail() {
                 <Pause className="h-3.5 w-3.5" />
                 Pause
               </Button>
+            ))}
+            {canManage && (
+              <Button type="button" size="sm" onClick={() => save()} disabled={saving} className="gap-1.5 h-9 min-w-[88px]">
+                <Save className="h-3.5 w-3.5" />
+                {saving ? "Saving…" : "Save"}
+              </Button>
             )}
-            <Button type="button" size="sm" onClick={() => save()} disabled={saving} className="gap-1.5 h-9 min-w-[88px]">
-              <Save className="h-3.5 w-3.5" />
-              {saving ? "Saving…" : "Save"}
-            </Button>
           </div>
         </div>
       </motion.div>
@@ -1344,7 +1360,7 @@ export default function LinkTreeDetail() {
         </motion.aside>
       </div>
 
-      {/* Mobile sticky save */}
+      {canManage && (
       <div className="xl:hidden fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] inset-x-3 z-40">
         <div className="rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-lg p-2 flex gap-2">
           {status !== "published" ? (
@@ -1362,6 +1378,7 @@ export default function LinkTreeDetail() {
           </Button>
         </div>
       </div>
+      )}
 
       {confirmDialog}
     </div>

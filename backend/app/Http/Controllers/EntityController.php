@@ -275,7 +275,7 @@ class EntityController extends Controller
                 return response()->json(null);
             }
 
-            if (! $this->access->canRead($user, $entity, $existing)) {
+            if (! $this->access->canMutate($user, $entity, $existing)) {
                 return $this->error('forbidden', 'You cannot delete this record', 403);
             }
 
@@ -292,7 +292,7 @@ class EntityController extends Controller
             return response()->json(null);
         }
 
-        if (! $this->access->canRead($user, $entity, $existing)) {
+        if (! $this->access->canMutate($user, $entity, $existing)) {
             return $this->error('forbidden', 'You cannot delete this record', 403);
         }
 
@@ -347,7 +347,7 @@ class EntityController extends Controller
             return $this->error('auth_required', 'Authentication required', 401);
         }
 
-        if (! $this->access->canRead($user, $entity, $existing)) {
+        if (! $this->access->canMutate($user, $entity, $existing)) {
             return $this->error('forbidden', 'You cannot update this record', 403);
         }
 

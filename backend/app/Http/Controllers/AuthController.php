@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\AuditLogService;
 use App\Services\JwtService;
 use App\Services\LinkWebhookService;
+use App\Services\TeamService;
 use App\Support\IdGenerator;
 use App\Support\SqlDate;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,7 @@ class AuthController extends Controller
         private JwtService $jwt,
         private AuditLogService $audit,
         private LinkWebhookService $linkWebhooks,
+        private TeamService $teams,
     ) {}
 
     public function register(Request $request): JsonResponse
@@ -184,7 +186,7 @@ class AuthController extends Controller
             ->where('is_approved', true);
 
         if (($authUser->role ?? '') !== 'admin') {
-            $query->where('id', $authUser->id);
+            $query->whereIn('id', $this->teams->visibleUserIds((int) $authUser->id));
         }
 
         $users = $query

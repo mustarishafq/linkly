@@ -36,6 +36,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import FormDialog, { FormDialogBody, FormDialogFooter } from "@/components/ui/form-dialog";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuth } from "@/lib/AuthContext";
+import { canManageRecord } from "@/lib/recordAccess";
 
 const STATUS_FILTERS = [
   { id: "all", label: "All" },
@@ -342,7 +344,10 @@ function CampaignStatusBadge({ status }) {
   );
 }
 
-function CampaignActionsMenu({ onEdit, onDelete, campaignId, triggerClassName }) {
+function CampaignActionsMenu({ onEdit, onDelete, campaign, campaignId, triggerClassName }) {
+  const { user } = useAuth();
+  const canManage = canManageRecord(user, campaign);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -359,21 +364,27 @@ function CampaignActionsMenu({ onEdit, onDelete, campaignId, triggerClassName })
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
-        <DropdownMenuItem onClick={onEdit}>
-          <Edit className="h-3.5 w-3.5 mr-2" /> Edit
-        </DropdownMenuItem>
+        {canManage && (
+          <DropdownMenuItem onClick={onEdit}>
+            <Edit className="h-3.5 w-3.5 mr-2" /> Edit
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <Link to={`/campaigns/${campaignId}`}>
             <ChevronRight className="h-3.5 w-3.5 mr-2" /> View Details
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-        </DropdownMenuItem>
+        {canManage && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -420,6 +431,7 @@ function CampaignCard({
             <div className="flex items-center gap-1 shrink-0">
               <CampaignStatusBadge status={campaign.status} />
               <CampaignActionsMenu
+                campaign={campaign}
                 campaignId={campaign.id}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -430,6 +442,7 @@ function CampaignCard({
 
           <div className="sm:hidden flex items-center justify-end gap-0.5 mt-2 -mr-1">
             <CampaignActionsMenu
+              campaign={campaign}
               campaignId={campaign.id}
               onEdit={onEdit}
               onDelete={onDelete}

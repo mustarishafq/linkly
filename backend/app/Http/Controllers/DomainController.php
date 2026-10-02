@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AuditLogService;
 use App\Services\DomainVerificationService;
+use App\Services\EntityAccessService;
 use App\Support\IdGenerator;
 use App\Support\SqlDate;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,7 @@ class DomainController extends Controller
     public function __construct(
         private DomainVerificationService $domains,
         private AuditLogService $audit,
+        private EntityAccessService $access,
     ) {}
 
     public function verify(Request $request, string $id): JsonResponse
@@ -36,10 +38,7 @@ class DomainController extends Controller
         $payload = is_string($row->payload) ? json_decode($row->payload, true) : (array) $row->payload;
         $user = $request->attributes->get('auth_user');
 
-        if (
-            $user->role !== 'admin'
-            && (string) ($payload['owner_user_id'] ?? '') !== (string) $user->id
-        ) {
+        if (! $this->access->canMutate($user, 'CustomDomain', is_array($payload) ? $payload : [])) {
             return $this->error('forbidden', 'You cannot verify this domain', 403);
         }
 
