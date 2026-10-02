@@ -177,13 +177,13 @@ function FileSongPlayer({ theme, compact = false, src }) {
   const audioRef = useRef(null);
   const userPaused = useRef(false);
   const [playing, setPlaying] = useState(false);
-  const [needsTap, setNeedsTap] = useState(false);
+  const [needsTap, setNeedsTap] = useState(true);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     userPaused.current = false;
     setFailed(false);
-    setNeedsTap(false);
+    setNeedsTap(true);
     setPlaying(false);
     if (audioRef.current) audioRef.current.volume = 0;
   }, [src]);
@@ -214,6 +214,7 @@ function FileSongPlayer({ theme, compact = false, src }) {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(step);
       setPlaying(true);
+      setNeedsTap(false);
     };
 
     const onPause = () => {
@@ -233,38 +234,74 @@ function FileSongPlayer({ theme, compact = false, src }) {
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || compact || !src) return undefined;
+    if (!audio || !src) return undefined;
 
     let cancelled = false;
+    let unlockTimer = 0;
 
-    const start = () => {
-      if (cancelled || userPaused.current || !audio.paused) return;
+    const tryPlay = () => {
+      if (cancelled || userPaused.current || !audio.paused) return Promise.resolve(false);
       audio.volume = 0;
-      audio
+      return audio
         .play()
         .then(() => {
           if (!cancelled) setNeedsTap(false);
+          return true;
         })
         .catch(() => {
           if (!cancelled) setNeedsTap(true);
+          return false;
         });
     };
 
-    const onGesture = (event) => {
+    const unlock = (event) => {
       if (userPaused.current) return;
-      if (event.target instanceof Element && event.target.closest("[data-song-player]")) return;
-      start();
+      // Let the play button handle its own toggle (avoid play+pause race).
+      if (
+        event?.target instanceof Element &&
+        event.target.closest("[data-song-player] button")
+      ) {
+        return;
+      }
+      tryPlay();
     };
 
-    start();
-    window.addEventListener("pointerdown", onGesture);
+    const onReady = () => {
+      tryPlay();
+    };
+
+    audio.addEventListener("canplay", onReady);
+    audio.addEventListener("loadeddata", onReady);
+
+    // Kick load + first attempt.
+    try {
+      audio.load();
+    } catch {
+      // Some browsers throw if src is empty mid-update.
+    }
+    tryPlay();
+
+    // Browsers block sound until a gesture — catch the first one anywhere.
+    window.addEventListener("pointerdown", unlock, true);
+    window.addEventListener("touchstart", unlock, true);
+    window.addEventListener("keydown", unlock, true);
+    window.addEventListener("wheel", unlock, { capture: true, passive: true });
+
+    // Retry shortly after mount (covers slow decode / late gesture policies).
+    unlockTimer = window.setTimeout(() => tryPlay(), 350);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("pointerdown", onGesture);
+      window.clearTimeout(unlockTimer);
+      audio.removeEventListener("canplay", onReady);
+      audio.removeEventListener("loadeddata", onReady);
+      window.removeEventListener("pointerdown", unlock, true);
+      window.removeEventListener("touchstart", unlock, true);
+      window.removeEventListener("keydown", unlock, true);
+      window.removeEventListener("wheel", unlock, true);
       audio.pause();
     };
-  }, [compact, src]);
+  }, [src]);
 
   function toggle() {
     const audio = audioRef.current;
@@ -282,7 +319,7 @@ function FileSongPlayer({ theme, compact = false, src }) {
   const status = failed
     ? "This file could not be played"
     : [artist, needsTap ? "Tap to play" : null].filter(Boolean).join(" · ") ||
-      (needsTap ? "Tap anywhere to play" : "Now playing");
+      (needsTap ? "Tap to play" : "Now playing");
 
   const card = (
     <SongCard
@@ -301,7 +338,7 @@ function FileSongPlayer({ theme, compact = false, src }) {
           src={src}
           loop
           playsInline
-          preload={compact ? "none" : "auto"}
+          preload="auto"
           className="pointer-events-none absolute h-px w-px opacity-0"
           onError={() => {
             setFailed(true);
@@ -313,7 +350,7 @@ function FileSongPlayer({ theme, compact = false, src }) {
           ref={audioRef}
           src={src}
           loop
-          preload={compact ? "none" : "auto"}
+          preload="auto"
           onError={() => {
             setFailed(true);
             setPlaying(false);
