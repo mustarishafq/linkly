@@ -24,7 +24,7 @@ import {
   getBackgroundPreset,
   getFontClass,
   getMusicEmbedUrl,
-  hasBackgroundSong,
+  parseBackgroundSong,
   getVideoEmbedUrl,
   isDarkTheme,
   linkButtonClass,
@@ -471,7 +471,8 @@ export function LinkTreeContent({
   const overlayOpacity = Math.min(100, Math.max(0, Number(merged.overlay_opacity) || 0));
   const showPresetOverlay = Boolean(backgroundImageUrl) && overlayOpacity > 0;
   const backgroundImageStyle = getBackgroundImageStyle(merged);
-  const hasSong = hasBackgroundSong(merged);
+  const song = parseBackgroundSong(merged.background_audio_url);
+  const hasSong = Boolean(song && !song.error);
   const visibleLinks = (links || []).filter((l) => {
     if (l?.enabled === false) return false;
     const type = l.type || "link";

@@ -89,6 +89,9 @@ const EDITOR_TABS = [
 const ACCEPTED_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 const UPLOAD_ACCEPT = "image/jpeg,image/png,image/webp,image/gif,image/svg+xml";
+const AUDIO_EXTENSIONS = ["mp3", "mpeg", "mpga", "m4a", "aac", "ogg", "wav", "webm", "mp4", "mov"];
+const MAX_AUDIO_BYTES = 30 * 1024 * 1024;
+const AUDIO_ACCEPT = "audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/webm,video/quicktime,.mp3,.m4a,.aac,.ogg,.wav,.webm,.mp4,.mov";
 
 function EditorSkeleton() {
   return (
@@ -373,6 +376,7 @@ export default function LinkTreeDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState("profile");
 
@@ -576,6 +580,39 @@ export default function LinkTreeDetail() {
       toast.error(error?.message || "Upload failed");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleAudioUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const extension = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!AUDIO_EXTENSIONS.includes(extension)) {
+      toast.error("Upload an MP3, M4A, AAC, OGG, WAV, WEBM, MP4, or MOV file");
+      return;
+    }
+    if (file.size > MAX_AUDIO_BYTES) {
+      toast.error("Audio file must be 30 MB or smaller");
+      return;
+    }
+
+    setUploadingAudio(true);
+    try {
+      const result = await db.uploads.audio(file);
+      const url = result?.file_url || "";
+      const name = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+      setTheme((t) => ({
+        ...t,
+        background_audio_url: url,
+        background_audio_title: t.background_audio_title?.trim() ? t.background_audio_title : name,
+      }));
+      toast.success("Song uploaded");
+    } catch (error) {
+      toast.error(error?.message || "Upload failed");
+    } finally {
+      setUploadingAudio(false);
     }
   }
 
@@ -1142,19 +1179,54 @@ export default function LinkTreeDetail() {
                 <div>
                   <h3 className="text-sm font-semibold">Background song</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Plays while someone views this page. Browsers start sound after the first tap, then the song loops.
+                    Plays while someone views this page. Upload an MP3 or MP4, or paste a YouTube or SoundCloud link. For TikTok, download the clip first, then upload it.
                   </p>
                 </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="background-audio-upload" className="cursor-pointer">
+                    <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-secondary text-xs font-medium hover:bg-secondary/80">
+                      <Upload className="h-3.5 w-3.5" />
+                      {uploadingAudio ? "Uploading…" : "Upload song"}
+                    </span>
+                  </Label>
+                  <Input
+                    id="background-audio-upload"
+                    type="file"
+                    accept={AUDIO_ACCEPT}
+                    className="hidden"
+                    onChange={handleAudioUpload}
+                    disabled={uploadingAudio}
+                  />
+                  {theme.background_audio_url ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 text-xs text-muted-foreground"
+                      onClick={() =>
+                        setTheme((t) => ({
+                          ...t,
+                          background_audio_url: "",
+                          background_audio_title: "",
+                          background_audio_artist: "",
+                          background_audio_cover_url: "",
+                        }))
+                      }
+                    >
+                      Remove song
+                    </Button>
+                  ) : null}
+                </div>
                 <Field
-                  label="Audio file URL"
+                  label="Audio file or link"
                   htmlFor="background-audio-url"
-                  hint="Direct MP3, M4A, OGG, or WAV file. Spotify and YouTube links cannot play as page audio."
+                  hint="MP3, M4A, MP4, YouTube, or SoundCloud. TikTok, Spotify, and Apple Music links cannot play here — upload the file instead."
                 >
                   <Input
                     id="background-audio-url"
                     value={theme.background_audio_url || ""}
                     onChange={(e) => setTheme((t) => ({ ...t, background_audio_url: e.target.value }))}
-                    placeholder="https://…/song.mp3"
+                    placeholder="https://…/song.mp3 or a YouTube link"
                     className="h-9"
                   />
                 </Field>

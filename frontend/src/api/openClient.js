@@ -447,6 +447,13 @@ const uploads = {
     formData.append("file", file);
     return uploadRequest("/uploads/logo", formData);
   },
+
+  /** @param {File} file */
+  async audio(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return uploadRequest("/uploads/audio", formData);
+  },
 };
 
 const integrations = {

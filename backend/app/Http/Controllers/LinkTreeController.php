@@ -69,13 +69,10 @@ class LinkTreeController extends Controller
         'rounded',
     ];
 
-    /** Hosts that cannot be played as page audio. */
+    /** Hosts that have no player we can run on the page. */
     private const BLOCKED_AUDIO_HOSTS = [
         'spotify.com',
         'music.apple.com',
-        'youtube.com',
-        'youtu.be',
-        'soundcloud.com',
         'tidal.com',
         'music.amazon.com',
         'deezer.com',
@@ -1048,11 +1045,65 @@ class LinkTreeController extends Controller
 
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
         $host = preg_replace('/^www\./', '', $host) ?? $host;
+        $path = (string) parse_url($url, PHP_URL_PATH);
+
+        if ($this->isYouTubeHost($host)) {
+            return $this->youtubeVideoId($host, $path, $url)
+                ? null
+                : 'Paste a YouTube watch, Shorts, or youtu.be link.';
+        }
+
+        if ($this->isTikTokHost($host)) {
+            return 'TikTok links cannot play as background audio. Download the video, then upload an MP3 or MP4.';
+        }
+
+        if ($host === 'soundcloud.com' || str_ends_with($host, '.soundcloud.com')) {
+            return null;
+        }
 
         foreach (self::BLOCKED_AUDIO_HOSTS as $blocked) {
             if ($host === $blocked || str_ends_with($host, '.'.$blocked)) {
-                return 'Spotify, Apple Music, YouTube, and SoundCloud cannot play as page audio. Use a direct audio file URL.';
+                return 'Spotify, Apple Music, Tidal, and Deezer cannot play as page audio. Upload an audio file or paste a YouTube or SoundCloud link.';
             }
+        }
+
+        return null;
+    }
+
+    private function isYouTubeHost(string $host): bool
+    {
+        return $host === 'youtu.be'
+            || $host === 'youtube.com'
+            || str_ends_with($host, '.youtube.com')
+            || $host === 'youtube-nocookie.com'
+            || str_ends_with($host, '.youtube-nocookie.com');
+    }
+
+    private function isTikTokHost(string $host): bool
+    {
+        return $host === 'tiktok.com'
+            || str_ends_with($host, '.tiktok.com')
+            || $host === 'vm.tiktok.com'
+            || $host === 'vt.tiktok.com';
+    }
+
+    private function youtubeVideoId(string $host, string $path, string $url): ?string
+    {
+        if ($host === 'youtu.be') {
+            $id = explode('/', trim($path, '/'))[0] ?? '';
+
+            return preg_match('/^[\w-]{11}$/', $id) ? $id : null;
+        }
+
+        $query = (string) parse_url($url, PHP_URL_QUERY);
+        parse_str($query, $params);
+        $fromQuery = (string) ($params['v'] ?? '');
+        if (preg_match('/^[\w-]{11}$/', $fromQuery)) {
+            return $fromQuery;
+        }
+
+        if (preg_match('#/(?:shorts|embed|live)/([\w-]{11})#', $path, $match)) {
+            return $match[1];
         }
 
         return null;

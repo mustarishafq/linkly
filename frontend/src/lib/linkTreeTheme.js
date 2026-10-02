@@ -169,42 +169,101 @@ export const DEFAULT_THEME = {
   background_audio_cover_url: "",
 };
 
-/** Hosts that only embed or link out — they cannot play as page audio. */
+/** Hosts that have no player we can run on the page. */
 const BLOCKED_AUDIO_HOSTS = [
   "spotify.com",
   "music.apple.com",
-  "youtube.com",
-  "youtu.be",
-  "soundcloud.com",
   "tidal.com",
   "music.amazon.com",
   "deezer.com",
 ];
 
-export function backgroundAudioIssue(rawUrl) {
+function songHost(rawUrl) {
+  const parsed = new URL(normalizeHttpUrl(rawUrl));
+  return {
+    parsed,
+    host: parsed.hostname.replace(/^www\./, "").toLowerCase(),
+  };
+}
+
+function hostIs(host, name) {
+  return host === name || host.endsWith(`.${name}`);
+}
+
+function youtubeVideoId(parsed, host) {
+  const youtube =
+    host === "youtu.be" ||
+    hostIs(host, "youtube.com") ||
+    hostIs(host, "youtube-nocookie.com");
+  if (!youtube) return null;
+
+  if (host === "youtu.be") {
+    const id = parsed.pathname.split("/").filter(Boolean)[0] || "";
+    return /^[\w-]{11}$/.test(id) ? id : "";
+  }
+
+  const fromQuery = parsed.searchParams.get("v") || "";
+  if (/^[\w-]{11}$/.test(fromQuery)) return fromQuery;
+
+  const match = parsed.pathname.match(/\/(?:shorts|embed|live)\/([\w-]{11})/);
+  return match?.[1] || "";
+}
+
+function tiktokHost(host) {
+  return host === "tiktok.com" || host.endsWith(".tiktok.com") || host === "vm.tiktok.com" || host === "vt.tiktok.com";
+}
+
+/**
+ * @returns {null | { error: string } | { kind: "file", src: string } | { kind: "youtube", videoId: string } | { kind: "soundcloud", src: string }}
+ */
+export function parseBackgroundSong(rawUrl) {
   const url = String(rawUrl || "").trim();
   if (!url) return null;
 
+  let parsed;
   let host = "";
   try {
-    host = new URL(normalizeHttpUrl(url)).hostname.replace(/^www\./, "").toLowerCase();
+    ({ parsed, host } = songHost(url));
   } catch {
-    return "Enter a valid audio file URL.";
+    return { error: "Enter a valid audio file URL." };
   }
 
-  const blocked = BLOCKED_AUDIO_HOSTS.some(
-    (name) => host === name || host.endsWith(`.${name}`)
-  );
-  if (blocked) {
-    return "Spotify, Apple Music, YouTube, and SoundCloud cannot play as page audio. Use a direct MP3, M4A, OGG, or WAV file URL.";
+  const youtubeId = youtubeVideoId(parsed, host);
+  if (youtubeId !== null) {
+    return youtubeId
+      ? { kind: "youtube", videoId: youtubeId }
+      : { error: "Paste a YouTube watch, Shorts, or youtu.be link." };
   }
 
-  return null;
+  if (tiktokHost(host)) {
+    return {
+      error:
+        "TikTok links cannot play as background audio. Download the video, then use Upload song (MP3 or MP4).",
+    };
+  }
+
+  if (hostIs(host, "soundcloud.com")) {
+    return { kind: "soundcloud", src: parsed.toString() };
+  }
+
+  if (BLOCKED_AUDIO_HOSTS.some((name) => hostIs(host, name))) {
+    return {
+      error:
+        "Spotify, Apple Music, Tidal, and Deezer cannot play as page audio. Upload an MP3 or MP4, or paste a YouTube or SoundCloud link.",
+    };
+  }
+
+  return { kind: "file", src: parsed.toString() };
+}
+
+export function backgroundAudioIssue(rawUrl) {
+  const song = parseBackgroundSong(rawUrl);
+  return song?.error || null;
 }
 
 export function hasBackgroundSong(theme) {
-  const url = String(theme?.background_audio_url || "").trim();
-  return Boolean(url) && !backgroundAudioIssue(url);
+  const song = parseBackgroundSong(theme?.background_audio_url);
+  return Boolean(song && !song.error);
 }
 
 export function getBackgroundPreset(id) {

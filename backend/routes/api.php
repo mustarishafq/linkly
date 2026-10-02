@@ -84,6 +84,7 @@ Route::middleware(JwtAuth::class)->group(function () {
     Route::get('/settings/qr-default', [SettingsController::class, 'qrDefault']);
     Route::get('/settings/general-defaults', [SettingsController::class, 'generalDefaults']);
     Route::post('/uploads/logo', [UploadController::class, 'logo']);
+    Route::post('/uploads/audio', [UploadController::class, 'audio']);
 
     Route::get('/link-trees', [LinkTreeController::class, 'index']);
     Route::post('/link-trees', [LinkTreeController::class, 'store']);
